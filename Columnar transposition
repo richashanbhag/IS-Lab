@@ -1,0 +1,51 @@
+import math
+
+# Encrypt function
+def columnar_encrypt(plaintext, key):
+    key_length = len(key)
+    # Create a list of empty strings for each column
+    columns = ['' for _ in range(key_length)]
+    
+    for i, char in enumerate(plaintext):
+        col = i % key_length  # Determine which column to place the character
+        columns[col] += char
+
+    # Sort columns based on alphabetical order of key
+    key_order = sorted(list(zip(key, columns)))
+    ciphertext = ''.join([col for k, col in key_order])
+    return ciphertext
+
+# Decrypt function
+def columnar_decrypt(ciphertext, key):
+    key_length = len(key)
+    n = len(ciphertext)
+    num_rows = math.ceil(n / key_length)
+
+    # Determine column lengths
+    key_order = sorted([(k, i) for i, k in enumerate(key)])
+    col_lengths = [num_rows] * key_length
+
+    # Fill the columns
+    cols = [''] * key_length
+    index = 0
+    for k, original_index in key_order:
+        cols[original_index] = ciphertext[index:index+col_lengths[original_index]]
+        index += col_lengths[original_index]
+
+    # Read the plaintext row-wise
+    plaintext = ''
+    for r in range(num_rows):
+        for c in range(key_length):
+            if r < len(cols[c]):
+                plaintext += cols[c][r]
+    return plaintext
+
+# Example usage
+message = "HELLOCOLUMNAR"
+key = "ZEBRA"
+
+ciphertext = columnar_encrypt(message, key)
+print("Encrypted:", ciphertext)
+
+decrypted = columnar_decrypt(ciphertext, key)
+print("Decrypted:", decrypted)
