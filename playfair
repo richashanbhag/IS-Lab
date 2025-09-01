@@ -1,0 +1,73 @@
+Playfair 
+def generate_matrix(key):
+    key=key.lower().replace("j","i")
+    matrix=[]
+    for c in key:
+        if c not in matrix and c.isalpha():
+            matrix.append(c)
+
+    for c in "abcdefghiklmnopqrstuvwxyz":
+        if c not in matrix :
+            matrix.append(c)
+    return [matrix[i:i+5] for i in range(0,25,5)]
+
+def find_pos(matrix,ch):
+    for i,row in enumerate(matrix):
+        if ch in row:
+            return i,row.index(ch)
+
+    return None
+
+def prepare_text(plaintext):
+    plaintext=plaintext.lower().replace("j","i")
+    new_text=""
+    i=0
+    while i<len(plaintext):
+        a=plaintext[i]
+        b=plaintext[i+1] if i+1<len(plaintext) else 'x'
+        if a==b:
+            new_text+=a+'x'
+            i+=1
+        else:
+            new_text+=a+b
+            i+=2
+
+    if len(new_text)%2 !=0:
+        new_text+='x'
+    return new_text
+
+def encrypt_pair(matrix,a,b):
+    r1,c1=find_pos(matrix,a)
+    r2,c2=find_pos(matrix,b)
+    if r1==r2:
+        return matrix[r1][(c1+1)%5]+matrix[r2][(c2+1)%5]
+    elif c1==c2:
+        return matrix[(r1+1)%5][c1]+matrix[(r2+1)%5][c2]
+    else:
+        return matrix[r1][c1]+matrix[r2][c2]
+
+def decrypt_pair(matrix, a, b):
+    r1, c1 = find_pos(matrix, a)
+    r2, c2 = find_pos(matrix, b)
+    if r1 == r2:
+        return matrix[r1][(c1-1)%5] + matrix[r2][(c2-1)%5]
+    elif c1 == c2:
+        return matrix[(r1-1)%5][c1] + matrix[(r2-1)%5][c2]
+    else:
+        return matrix[r1][c2] + matrix[r2][c1]
+
+def playfair_encrypt(plaintext,key):
+    matrix=generate_matrix(key)
+    text=prepare_text(plaintext)
+    ciphertext=""
+    for i in range(0,len(text),2):
+        ciphertext+=encrypt_pair(matrix,text[i],text[i+1])
+    return ciphertext.upper()
+def playfair_decrypt(ciphertext,key):
+    matrix=generate_matrix(key)
+    text=ciphertext.lower()
+    plaintext=""
+    for i in range(0,len(text),2):
+       plaintext+=decrypt_pair(matrix,text[i],text[i+1])
+    
+    return plaintext
