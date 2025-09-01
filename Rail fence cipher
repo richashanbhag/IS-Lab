@@ -1,0 +1,58 @@
+# Encrypt function
+def rail_fence_encrypt(text, key):
+    rail = ['' for _ in range(key)]
+    row = 0
+    direction = 1  # 1 means moving down, -1 means moving up
+
+    for char in text:
+        rail[row] += char
+        row += direction
+        if row == 0 or row == key-1:
+            direction *= -1
+
+    return ''.join(rail)
+
+# Decrypt function
+def rail_fence_decrypt(cipher, key):
+    n = len(cipher)
+    # Create an empty rail matrix
+    rail = [['\n' for _ in range(n)] for _ in range(key)]
+    
+    # Mark positions with '*'
+    row, direction = 0, 1
+    for i in range(n):
+        rail[row][i] = '*'
+        row += direction
+        if row == 0 or row == key-1:
+            direction *= -1
+
+    # Fill the rail matrix with ciphertext
+    index = 0
+    for r in range(key):
+        for c in range(n):
+            if rail[r][c] == '*' and index < n:
+                rail[r][c] = cipher[index]
+                index += 1
+
+    # Read the matrix in zig-zag manner
+    result = ''
+    row, direction = 0, 1
+    for i in range(n):
+        result += rail[row][i]
+        row += direction
+        if row == 0 or row == key-1:
+            direction *= -1
+
+    return result
+
+# Example usage
+text = "HELLORAILFENCE"
+key = 3
+
+ciphertext = rail_fence_encrypt(text, key)
+print("Encrypted:", ciphertext)
+
+decrypted = rail_fence_decrypt(ciphertext, key)
+print("Decrypted:", decrypted)
+
+             
