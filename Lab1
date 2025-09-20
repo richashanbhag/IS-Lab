@@ -153,3 +153,522 @@ while True:
 
     except ValueError:
         print("\n Invalid key. Please enter integers only.")
+
+
+# Encrypt the message "the house is being sold tonight" using one of the following ciphers.
+# Ignore the space between words. Decrypt the message to get the original plaintext:
+# • Vigenere cipher with key: "dollars"
+# • Autokey cipher with key = 7
+import re
+# --- Vigenère Cipher Functions ---
+
+
+def encrypt_vigenere(plaintext, key):
+    """Encrypts text using Vigenère, preserving case."""
+    result = ""
+    # Sanitize key to be only letters and handle empty key case
+    key = re.sub(r'[^a-zA-Z]', '', key)
+    if not key: return "Error: Key must contain letters."
+
+    key_index = 0
+    for char in plaintext:
+        if not char.isalpha():
+            result += char
+            continue
+
+        # Determine the shift amount from the key
+        key_char = key[key_index % len(key)]
+        key_base = ord('A') if key_char.isupper() else ord('a')
+        shift = ord(key_char) - key_base
+
+        # Apply the shift
+        char_base = ord('A') if char.isupper() else ord('a')
+        p_val = ord(char) - char_base
+        c_val = (p_val + shift) % 26
+        result += chr(c_val + char_base)
+
+        key_index += 1
+    return result
+
+
+def decrypt_vigenere(ciphertext, key):
+    """Decrypts text using Vigenère, preserving case."""
+    result = ""
+    # Sanitize key
+    key = re.sub(r'[^a-zA-Z]', '', key)
+    if not key: return "Error: Key must contain letters."
+
+    key_index = 0
+    for char in ciphertext:
+        if not char.isalpha():
+            result += char
+            continue
+
+        # Determine the shift amount from the key
+        key_char = key[key_index % len(key)]
+        key_base = ord('A') if key_char.isupper() else ord('a')
+        shift = ord(key_char) - key_base
+
+        # Apply the reverse shift
+        char_base = ord('A') if char.isupper() else ord('a')
+        c_val = ord(char) - char_base
+        p_val = (c_val - shift) % 26
+        result += chr(p_val + char_base)
+
+        key_index += 1
+    return result
+
+
+# --- Autokey Cipher Functions ---
+def encrypt_autokey(plaintext, key_num):
+    """Encrypts text using Autokey, preserving case."""
+    result = ""
+    current_key = key_num
+    for char in plaintext:
+        if not char.isalpha():
+            result += char
+            continue
+
+        base = ord('A') if char.isupper() else ord('a')
+        p_val = ord(char) - base
+        c_val = (p_val + current_key) % 26
+        result += chr(c_val + base)
+        current_key = p_val
+    return result
+
+
+def decrypt_autokey(ciphertext, key_num):
+    """Decrypts text using Autokey, preserving case."""
+    result = ""
+    current_key = key_num
+    for char in ciphertext:
+        if not char.isalpha():
+            result += char
+            continue
+
+        base = ord('A') if char.isupper() else ord('a')
+        c_val = ord(char) - base
+        p_val = (c_val - current_key) % 26
+        result += chr(p_val + base)
+        current_key = p_val
+    return result
+
+
+# --- Main Menu Loop ---
+while True:
+    print("  1. Vigenère Cipher")
+    print("  2. Autokey Cipher")
+    print("  3. Exit")
+
+    choice = input("Enter your choice (1, 2, or 3): ")
+
+    if choice == '3':
+        print("Exiting")
+        break
+
+    if choice not in ['1', '2']:
+        print("Invalid choice! Please select a valid option.")
+        continue
+
+    try:
+        plaintext = input("Enter Plaintext: ")
+
+        if choice == '1':
+            key = input("Enter a string key for Vigenère Cipher: ")
+            encrypted = encrypt_vigenere(plaintext, key)
+            print(f"Encrypted:  {encrypted}")
+            decrypted = decrypt_vigenere(encrypted, key)
+            print(f"Decrypted:  {decrypted}")
+
+        elif choice == '2':
+            key_num = int(input("Enter a numerical key for Autokey Cipher (0-25): "))
+            if not 0 <= key_num <= 25:
+                print("\nKey must be between 0 and 25.")
+                continue
+
+            encrypted = encrypt_autokey(plaintext, key_num)
+            print(f"Encrypted:  {encrypted}")
+            decrypted = decrypt_autokey(encrypted, key_num)
+            print(f"Decrypted:  {decrypted}")
+
+    except ValueError:
+        print("\nInvalid key. Please enter an integer for the Autokey cipher.")
+
+
+# Use the Playfair cipher to encipher the message "The key is hidden under the door pad". The 
+# secret key can be made by filling the first and part of the second row with the word 
+# "GUIDANCE" and filling the rest of the matrix with the rest of the alphabet.
+
+
+# -- Playfair---
+
+def generate_key_square(key):
+    alphabet = "ABCDEFGHIKLMNOPQRSTUVWXYZ"
+    key = key.upper().replace("J", "I")
+    key_unique = ""
+    for char in key:
+        if char not in key_unique and char in alphabet:
+            key_unique += char
+    matrix_chars = key_unique
+    for char in alphabet:
+        if char not in matrix_chars:
+            matrix_chars += char
+    return [list(matrix_chars[i:i + 5]) for i in range(0, 25, 5)]
+
+
+def prepare_plaintext(plaintext):
+    """Correctly prepares plaintext by formatting it into digraphs."""
+    # Sanitize and create a list of characters
+    text_chars = list("".join(filter(str.isalpha, plaintext)).upper().replace("J", "I"))
+
+    # Insert 'X' between identical letters
+    i = 0
+    while i < len(text_chars) - 1:
+        if text_chars[i] == text_chars[i + 1]:
+            text_chars.insert(i + 1, 'X')
+        i += 2
+
+    # If the length is odd, append an 'X'
+    if len(text_chars) % 2 != 0:
+        text_chars.append('X')
+
+    return "".join(text_chars)
+
+
+def find_char_coords(square, char):
+    for r, row in enumerate(square):
+        for c, cell in enumerate(row):
+            if cell == char:
+                return r, c
+    return None, None
+
+
+def encrypt_playfair(plaintext, key):
+    square = generate_key_square(key)
+    processed_text = prepare_plaintext(plaintext)
+    ciphertext = ""
+    for i in range(0, len(processed_text), 2):
+        char1, char2 = processed_text[i], processed_text[i + 1]
+        r1, c1 = find_char_coords(square, char1)
+        r2, c2 = find_char_coords(square, char2)
+        if r1 == r2:
+            ciphertext += square[r1][(c1 + 1) % 5] + square[r2][(c2 + 1) % 5]
+        elif c1 == c2:
+            ciphertext += square[(r1 + 1) % 5][c1] + square[(r2 + 1) % 5][c2]
+        else:
+            ciphertext += square[r1][c2] + square[r2][c1]
+    return ciphertext
+
+
+def decrypt_playfair(ciphertext, key):
+    square = generate_key_square(key)
+    plaintext = ""
+    for i in range(0, len(ciphertext), 2):
+        char1, char2 = ciphertext[i], ciphertext[i + 1]
+        r1, c1 = find_char_coords(square, char1)
+        r2, c2 = find_char_coords(square, char2)
+        if r1 == r2:
+            plaintext += square[r1][(c1 - 1) % 5] + square[r2][(c2 - 1) % 5]
+        elif c1 == c2:
+            plaintext += square[(r1 - 1) % 5][c1] + square[(r2 - 1) % 5][c2]
+        else:
+            plaintext += square[r1][c2] + square[r2][c1]
+    return plaintext
+
+
+def clean_decrypted_text(text):
+    """Removes the filler 'X's from the decrypted text."""
+    # Remove 'X' between two identical letters
+    result = []
+    i = 0
+    while i < len(text):
+        result.append(text[i])
+        if (i + 2 < len(text) and
+                text[i] == text[i + 2] and text[i + 1] == 'X'):
+            i += 2  # Skip the 'X' and the next identical letter
+        else:
+            i += 1
+
+    cleaned_text = "".join(result)
+
+    # Remove a trailing 'X' if it was for padding
+    if cleaned_text.endswith('X'):
+        cleaned_text = cleaned_text[:-1]
+
+    return cleaned_text
+
+
+# --- Main execution ---
+if __name__ == "__main__":
+    key = "GUIDANCE"
+    message = "The key is hidden under the door pad"
+
+    encrypted_message = encrypt_playfair(message, key)
+    print(f"Original Message:     {message}")
+    print(f"Encrypted Text:       {encrypted_message}")
+
+    decrypted_message = decrypt_playfair(encrypted_message, key)
+    print(f"Decrypted (raw):      {decrypted_message}")
+
+    final_message = clean_decrypted_text(decrypted_message)
+    print(f"Decrypted (cleaned):  {final_message}")
+
+
+# Use a Hill cipher to encipher the message "We live in an insecure world". Use the following 
+# key:  [03 03 2 07]
+import numpy as np
+import math
+
+
+def matrix_inverse(matrix):
+    """
+    Finds the modular inverse of a square matrix (works for 2x2, 3x3, etc.).
+    """
+    det = int(np.round(np.linalg.det(matrix)))
+    det_inv = pow(det, -1, 26)
+
+    adjugate = np.round(det * np.linalg.inv(matrix)).astype(int)
+    inverse_matrix = (det_inv * adjugate) % 26
+    return inverse_matrix
+
+
+def hill_cipher(message, key, mode):
+    """
+    Encrypts or decrypts a message using a Hill cipher of a given key size.
+    """
+    # Infer the matrix size from the key's shape (e.g., 2 for 2x2, 3 for 3x3)
+    matrix_size = key.shape[0]
+
+    # 1. Prepare the text
+    sanitized_message = "".join(filter(str.isalpha, message)).upper()
+
+    # Pad the message to be a multiple of the matrix size
+    pad_len = (matrix_size - len(sanitized_message) % matrix_size) % matrix_size
+    sanitized_message += 'X' * pad_len
+
+    # 2. Convert text to numerical vectors
+    vectors = []
+    for i in range(0, len(sanitized_message), matrix_size):
+        # Create a vector from a slice of the message
+        vector_slice = sanitized_message[i: i + matrix_size]
+        vec = [ord(char) - ord('A') for char in vector_slice]
+        vectors.append(vec)
+
+    # 3. Get the correct matrix for the operation
+    if mode == 'encrypt':
+        processing_matrix = key
+    elif mode == 'decrypt':
+        processing_matrix = matrix_inverse(key)
+
+    # 4. Perform matrix multiplication
+    result_text = ""
+    for vec in vectors:
+        # We multiply by the transpose of the key to match the mathematical definition C = K*P
+        result_vec = np.dot(vec, processing_matrix.T) % 26
+        for num in result_vec:
+            result_text += chr(int(num) + ord('A'))
+
+    return result_text
+
+
+# --- Main interactive loop ---
+if __name__ == "__main__":
+    while True:
+        print("1. Encrypt & Decrypt a message")
+        print("2. Exit")
+        choice = input("Enter your choice (1 or 2): ")
+
+        if choice == '2':
+            print("Exiting")
+            break
+
+        if choice == '1':
+            try:
+                # Ask user for matrix size
+                size_str = input("Select matrix size (enter '2' for 2x2 or '3' for 3x3): ")
+                matrix_size = int(size_str)
+                if matrix_size not in [2, 3]:
+                    print("\nInvalid size. Please enter 2 or 3.")
+                    continue
+
+                num_keys = matrix_size ** 2
+
+                # Get user input for the message
+                message = input("Enter the message: ")
+
+                # Get user input for the key
+                print(
+                    f"Enter the {num_keys} numbers for the {matrix_size}x{matrix_size} key matrix, separated by spaces.")
+                key_str = input(f"(e.g., for 3x3: 6 24 1 13 16 10 20 17 15): ")
+                key_nums = list(map(int, key_str.split()))
+
+                if len(key_nums) != num_keys:
+                    print(f"\nPlease enter exactly {num_keys} numbers.")
+                    continue
+
+                key = np.array(key_nums).reshape(matrix_size, matrix_size)
+
+                # Check if the key is valid for decryption
+                det = int(np.round(np.linalg.det(key)))
+                if det == 0 or math.gcd(det, 26) != 1:
+                    print("\nThe provided key is not invertible. Decryption is not possible.")
+                    continue
+
+                print(f"Original Message:  {message}")
+                print(f"Key Matrix ({matrix_size}x{matrix_size}):\n{key}\n")
+
+                # --- Encryption ---
+                encrypted_message = hill_cipher(message, key, 'encrypt')
+                print(f"Encrypted Text:    {encrypted_message}")
+
+                # --- Decryption ---
+                decrypted_message = hill_cipher(encrypted_message, key, 'decrypt')
+                print(f"Decrypted Text:    {decrypted_message}")
+
+            except ValueError:
+                print(f"\nInvalid input. Please enter {num_keys} integers for the key.")
+            except Exception as e:
+                print(f"\nAn unexpected error occurred: {e}")
+        else:
+            print("\nInvalid choice. Please enter 1 or 2.")
+
+
+
+# John is reading a mystery book involving cryptography. In one part of the book, the author
+# gives a ciphertext "CIW" and two paragraphs later the author tells the reader that this is a shift
+# cipher and the plaintext is "yes". In the next chapter, the hero found a tablet in a cave with
+# "XVIEWYWI" engraved on it. John immediately found the actual meaning of the ciphertext.
+# Identify the type of attack and plaintext
+# --Known plaintext attack
+
+def find_shift_key(plain_sample, cipher_sample):
+    """
+    Finds the shift key using a known-plaintext attack.
+    It only needs one character pair to determine the key.
+    """
+    # Convert to numbers (A=0, Z=25), ensuring consistent case
+    plain_num = ord(plain_sample[0].lower()) - ord('a')
+    cipher_num = ord(cipher_sample[0].lower()) - ord('a')
+
+    # Calculate key using k = (C - P) mod 26
+    key = (cipher_num - plain_num) % 26
+    return key
+
+
+def shift_decrypt(ciphertext, key):
+    """
+    Decrypts a ciphertext using a given shift key, preserving case.
+    """
+    plaintext = ""
+    for char in ciphertext:
+        if char.isalpha():
+            # Determine the base for ASCII conversion ('A' or 'a')
+            base = ord('A') if char.isupper() else ord('a')
+
+            # Decrypt the character
+            cipher_num = ord(char) - base
+            plain_num = (cipher_num - key) % 26
+
+            plaintext += chr(plain_num + base)
+        else:
+            # If not a letter, keep the character as is
+            plaintext += char
+
+    return plaintext
+
+
+# --- Main execution ---
+if __name__ == "__main__":
+    # The known information from the book
+    known_plaintext = "yes"
+    known_ciphertext = "CIW"
+
+    # 1. Identify the type of attack and find the key
+    attack_type = "Known-Plaintext Attack"
+    secret_key = find_shift_key(known_plaintext, known_ciphertext)
+
+    print(f"Attack Type: {attack_type}")
+    print(f"Discovered Key: {secret_key} ")
+
+    # 2. Decrypt the new message found on the tablet
+    new_ciphertext = "XVIEWYWI"
+    final_plaintext = shift_decrypt(new_ciphertext, secret_key)
+
+    print(f"Ciphertext from tablet: {new_ciphertext}")
+    print(f"Decrypted Plaintext: {final_plaintext}")
+
+
+# Use a brute-force attack to decipher the following message. Assume that you know it is an
+# affine cipher and that the plaintext "ab" is enciphered to "GL":
+# XPALASXYFGFUKPXUSOGEUTKCDGEXANMGNVS
+
+
+def mod_inverse(a, m):
+    """Calculates the modular multiplicative inverse of a under modulo m."""
+    for x in range(1, m):
+        if (a * x) % m == 1:
+            return x
+    return None
+
+
+def brute_force_affine(plain_sample, cipher_sample):
+    """
+    Finds the Affine cipher key (a, b) by testing all valid keys
+    against a known plaintext/ciphertext pair.
+    """
+    possible_a = [1, 3, 5, 7, 9, 11, 15, 17, 19, 21, 23, 25]
+
+    # Convert samples to numbers (A=0, Z=25)
+    p1 = ord(plain_sample[0].lower()) - ord('a')
+    p2 = ord(plain_sample[1].lower()) - ord('a')
+    c1 = ord(cipher_sample[0].lower()) - ord('a')
+    c2 = ord(cipher_sample[1].lower()) - ord('a')
+
+    # Iterate through all possible keys
+    for a in possible_a:
+        for b in range(26):
+            # Check if this key encrypts the sample correctly
+            if (a * p1 + b) % 26 == c1 and (a * p2 + b) % 26 == c2:
+                return a, b  # Key found
+
+    return None, None  # Key not found
+
+
+def affine_decrypt(ciphertext, key_a, key_b):
+    """Decrypts a ciphertext using a given Affine key (a, b)."""
+    plaintext = ""
+    a_inv = mod_inverse(key_a, 26)
+    if a_inv is None:
+        return "Error: Key 'a' has no modular inverse."
+
+    for char in ciphertext.upper():
+        if char.isalpha():
+            c = ord(char) - ord('A')
+            p = (a_inv * (c - key_b)) % 26
+            plaintext += chr(p + ord('A'))
+        else:
+            plaintext += char
+
+    return plaintext
+
+
+# --- Main execution ---
+if __name__ == "__main__":
+    known_plain = "ab"
+    known_cipher = "GL"
+    target_ciphertext = "XPALASXYFGFUKPXUSOGEUTKCDGEXANMGNVS"
+
+    print(f"Known Plaintext: '{known_plain}' -> Ciphertext: '{known_cipher}'")
+
+    # 1. Find the key using the brute-force check
+    a, b = brute_force_affine(known_plain, known_cipher)
+
+    if a is not None:
+        print(f"\n Key Found! a = {a}, b = {b}")
+
+        # 2. Decrypt the target message with the found key
+        decrypted_message = affine_decrypt(target_ciphertext, a, b)
+        print(f"\nTarget Ciphertext: {target_ciphertext}")
+        print(f"Decrypted Plaintext: {decrypted_message}")
+    else:
+        print("\nCould not find a valid key for the given sample.")
