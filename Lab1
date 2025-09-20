@@ -672,3 +672,116 @@ if __name__ == "__main__":
         print(f"Decrypted Plaintext: {decrypted_message}")
     else:
         print("\nCould not find a valid key for the given sample.")
+
+
+import math
+
+# Encrypt function
+def columnar_encrypt(plaintext, key):
+    key_length = len(key)
+    # Create a list of empty strings for each column
+    columns = ['' for _ in range(key_length)]
+    
+    for i, char in enumerate(plaintext):
+        col = i % key_length  # Determine which column to place the character
+        columns[col] += char
+
+    # Sort columns based on alphabetical order of key
+    key_order = sorted(list(zip(key, columns)))
+    ciphertext = ''.join([col for k, col in key_order])
+    return ciphertext
+
+# Decrypt function
+def columnar_decrypt(ciphertext, key):
+    key_length = len(key)
+    n = len(ciphertext)
+    num_rows = math.ceil(n / key_length)
+
+    # Determine column lengths
+    key_order = sorted([(k, i) for i, k in enumerate(key)])
+    col_lengths = [num_rows] * key_length
+
+    # Fill the columns
+    cols = [''] * key_length
+    index = 0
+    for k, original_index in key_order:
+        cols[original_index] = ciphertext[index:index+col_lengths[original_index]]
+        index += col_lengths[original_index]
+
+    # Read the plaintext row-wise
+    plaintext = ''
+    for r in range(num_rows):
+        for c in range(key_length):
+            if r < len(cols[c]):
+                plaintext += cols[c][r]
+    return plaintext
+
+# Example usage
+message = "HELLOCOLUMNAR"
+key = "ZEBRA"
+
+ciphertext = columnar_encrypt(message, key)
+print("Encrypted:", ciphertext)
+
+decrypted = columnar_decrypt(ciphertext, key)
+print("Decrypted:", decrypted)
+
+
+# Encrypt function
+def rail_fence_encrypt(text, key):
+    rail = ['' for _ in range(key)]
+    row = 0
+    direction = 1  # 1 means moving down, -1 means moving up
+
+    for char in text:
+        rail[row] += char
+        row += direction
+        if row == 0 or row == key-1:
+            direction *= -1
+
+    return ''.join(rail)
+
+# Decrypt function
+def rail_fence_decrypt(cipher, key):
+    n = len(cipher)
+    # Create an empty rail matrix
+    rail = [['\n' for _ in range(n)] for _ in range(key)]
+    
+    # Mark positions with '*'
+    row, direction = 0, 1
+    for i in range(n):
+        rail[row][i] = '*'
+        row += direction
+        if row == 0 or row == key-1:
+            direction *= -1
+
+    # Fill the rail matrix with ciphertext
+    index = 0
+    for r in range(key):
+        for c in range(n):
+            if rail[r][c] == '*' and index < n:
+                rail[r][c] = cipher[index]
+                index += 1
+
+    # Read the matrix in zig-zag manner
+    result = ''
+    row, direction = 0, 1
+    for i in range(n):
+        result += rail[row][i]
+        row += direction
+        if row == 0 or row == key-1:
+            direction *= -1
+
+    return result
+
+# Example usage
+text = "HELLORAILFENCE"
+key = 3
+
+ciphertext = rail_fence_encrypt(text, key)
+print("Encrypted:", ciphertext)
+
+decrypted = rail_fence_decrypt(ciphertext, key)
+print("Decrypted:", decrypted)
+
+             
