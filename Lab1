@@ -1,0 +1,155 @@
+#  Encrypt the message "I am learning information security" using one of the following ciphers.
+# Ignore the space between words. Decrypt the message to get the original plaintext:
+# a) Additive cipher with key = 20
+# b) Multiplicative cipher with key = 15
+# c) Affine cipher with key = (15, 20)
+import math
+
+
+# --- mod inverse function ---
+def mod_inverse(a, m):
+    """Calculates the modular multiplicative inverse of a under modulo m."""
+    for x in range(1, m):
+        if (a * x) % m == 1:
+            return x
+    return None
+
+
+# --- Additive Cipher Functions ---
+def encrypt_additive(plaintext, key):
+    result = ""
+    for char in plaintext:
+        if not char.isalpha():
+            result += char
+            continue
+        base = ord('A') if char.isupper() else ord('a')
+        p = ord(char) - base
+        c = (p + key) % 26
+        result += chr(c + base)
+    return result
+
+
+def decrypt_additive(ciphertext, key):
+    result = ""
+    for char in ciphertext:
+        if not char.isalpha():
+            result += char
+            continue
+        base = ord('A') if char.isupper() else ord('a')
+        c = ord(char) - base
+        p = (c - key) % 26
+        result += chr(p + base)
+    return result
+
+
+# --- Multiplicative Cipher Functions ---
+def encrypt_multiplicative(plaintext, key):
+    result = ""
+    for char in plaintext:
+        if not char.isalpha():
+            result += char
+            continue
+        base = ord('A') if char.isupper() else ord('a')
+        p = ord(char) - base
+        c = (p * key) % 26
+        result += chr(c + base)
+    return result
+
+
+def decrypt_multiplicative(ciphertext, key):
+    result = ""
+    key_inv = mod_inverse(key, 26)
+    for char in ciphertext:
+        if not char.isalpha():
+            result += char
+            continue
+        base = ord('A') if char.isupper() else ord('a')
+        c = ord(char) - base
+        p = (c * key_inv) % 26
+        result += chr(p + base)
+    return result
+
+
+# --- Affine Cipher Functions ---
+def encrypt_affine(plaintext, key_a, key_b):
+    result = ""
+    for char in plaintext:
+        if not char.isalpha():
+            result += char
+            continue
+        base = ord('A') if char.isupper() else ord('a')
+        p = ord(char) - base
+        c = (key_a * p + key_b) % 26
+        result += chr(c + base)
+    return result
+
+
+def decrypt_affine(ciphertext, key_a, key_b):
+    result = ""
+    key_a_inv = mod_inverse(key_a, 26)
+    for char in ciphertext:
+        if not char.isalpha():
+            result += char
+            continue
+        base = ord('A') if char.isupper() else ord('a')
+        c = ord(char) - base
+        p = (key_a_inv * (c - key_b)) % 26
+        result += chr(p + base)
+    return result
+
+
+# --- Main Menu Loop ---
+while True:
+    print("  1. Additive Cipher")
+    print("  2. Multiplicative Cipher")
+    print("  3. Affine Cipher")
+    print("  4. Exit")
+
+    choice = input("Enter your choice (1, 2, 3, or 4): ")
+
+    if choice == '4':
+        print("Exiting..")
+        break
+
+    if choice not in ['1', '2', '3']:
+        print("Invalid choice! Please select a valid option.")
+        continue
+
+    try:
+        plaintext = input("Enter Plaintext: ")
+
+        if choice == '1':
+            key = int(input("Enter key for Additive Cipher: "))
+            encrypted = encrypt_additive(plaintext, key)
+            print(f"Encrypted Text: {encrypted}")
+
+            decrypted = decrypt_additive(encrypted, key)
+            print(f"Decrypted Text: {decrypted}")
+
+        elif choice == '2':
+            key = int(input("Enter key for Multiplicative Cipher (must be coprime with 26): "))
+            if math.gcd(key, 26) != 1:
+                print("\n Key is not valid. It must be coprime with 26.")
+                continue
+
+            encrypted = encrypt_multiplicative(plaintext, key)
+            print(f"Encrypted Text: {encrypted}")
+
+            decrypted = decrypt_multiplicative(encrypted, key)
+            print(f"Decrypted Text: {decrypted}")
+
+        elif choice == '3':
+            key_a = int(input("Enter key 'a' for Affine Cipher (must be coprime with 26): "))
+            if math.gcd(key_a, 26) != 1:
+                print("\nKey 'a' is not valid. It must be coprime with 26.")
+                continue
+            key_b = int(input("Enter key 'b' for Affine Cipher: "))
+
+            encrypted = encrypt_affine(plaintext, key_a, key_b)
+            print(f"Encrypted Text: {encrypted}")
+
+            decrypted = decrypt_affine(encrypted, key_a, key_b)
+            print(f"Decrypted Text: {decrypted}")
+
+    except ValueError:
+        print("\n Invalid key. Please enter integers only.")
