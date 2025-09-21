@@ -1,0 +1,25 @@
+# Encrypt the message "Confidential Data" using DES with the following key: "A1B2C3D4".
+# Then decrypt the ciphertext to verify the original message.
+# DES functions
+from Crypto.Cipher import DES
+from Crypto.Util.Padding import pad, unpad
+
+# Step 1: Define plaintext and key
+plaintext = "Confidential Data"
+key = b"A1B2C3D4"  # Key must be exactly 8 bytes for DES
+
+# Step 2: Create DES cipher object in ECB mode
+cipher = DES.new(key, DES.MODE_ECB)
+
+# Step 3: Encrypt
+# DES works on blocks of 8 bytes, so we must pad the plaintext
+padded_text = pad(plaintext.encode(), 8)  # Padding to make length a multiple of 8
+ciphertext = cipher.encrypt(padded_text)
+
+print("Ciphertext (Hex):", ciphertext.hex())
+
+# Step 4: Decrypt
+decrypted_padded = cipher.decrypt(ciphertext)
+decrypted_text = unpad(decrypted_padded, 8).decode()
+
+print("Decrypted Text:", decrypted_text)
