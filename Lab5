@@ -1,0 +1,354 @@
+# Custom Hash Function Implementation
+# Starts with initial hash = 5381
+# For each character: hash = (hash * 33 + ASCII value of character)
+# Keeps the hash value within 32-bit range using bitwise operations
+
+def custom_hash(input_string):
+    """
+    Custom hash function that processes a string and returns a 32-bit hash value.
+    """
+    # Step 1: Initialize hash value
+    hash_value = 5381
+
+    # Step 2: Iterate through each character of the input string
+    for char in input_string:
+        # Multiply current hash by 33, add ASCII value of character, and mask to 32 bits
+        hash_value = ((hash_value * 33) + ord(char)) & 0xFFFFFFFF
+
+    # Step 3: Return final hash value
+    return hash_value
+
+
+# Main program to demonstrate the hash function
+def main():
+    print("=== Custom Hash Function ===")
+
+    # Take input from the user
+    user_input = input("Enter a string to hash: ")
+
+    # Calculate the hash
+    result = custom_hash(user_input)
+
+    # Display result
+    print(f"\nInput String : {user_input}")
+    print(f"Generated Hash (32-bit) : {result}")
+    print(f"Hexadecimal Hash : {hex(result)}")  # Optional: display in hexadecimal
+
+
+# Run the program
+if __name__ == "__main__":
+    main()
+
+
+# Using socket programming in Python, demonstrate the application of 
+# hash functions for ensuring data integrity during transmission over a 
+# network. Write server and client scripts where the server computes the 
+# hash of received data and sends it back to the client, which then verifies 
+# the integrity of the data by comparing the received hash with the locally 
+# computed hash. Show how the hash verification detects data corruption 
+# or tampering during transmission.
+#server.py starts
+import socket
+import hashlib
+
+# Function to compute SHA-256 hash
+def compute_hash(data):
+    return hashlib.sha256(data).hexdigest()
+
+def start_server(host='127.0.0.1', port=5000):
+    # Create a TCP socket
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((host, port))
+    server_socket.listen(1)
+
+    print(f"[*] Server started on {host}:{port}")
+    print("[*] Waiting for connection...")
+
+    conn, addr = server_socket.accept()
+    print(f"[+] Connection established with {addr}")
+
+    # Receive data from client
+    data = conn.recv(4096)
+    print(f"[*] Data received: {data.decode()}")
+
+    # Compute hash of received data
+    data_hash = compute_hash(data.encode() if isinstance(data, str) else data)
+    print(f"[*] Computed hash: {data_hash}")
+
+    # Send the hash back to client
+    conn.send(data_hash.encode())
+
+    print("[*] Hash sent back to client for verification.")
+
+    conn.close()
+    server_socket.close()
+    print("[*] Server connection closed.")
+
+if __name__ == "__main__":
+    start_server()
+#server.py ends
+
+import socket
+import hashlib
+
+# Function to compute SHA-256 hash
+def compute_hash(data):
+    return hashlib.sha256(data).hexdigest()
+
+def start_client(host='127.0.0.1', port=5000):
+    # Create a TCP socket
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((host, port))
+
+    # Input message from user
+    message = input("Enter the message to send: ").encode()
+
+    # Send data to server
+    client_socket.send(message)
+    print(f"[*] Data sent to server: {message.decode()}")
+
+    # Receive hash from server
+    server_hash = client_socket.recv(4096).decode()
+    print(f"[*] Hash received from server: {server_hash}")
+
+    # Compute local hash
+    local_hash = compute_hash(message)
+    print(f"[*] Local computed hash: {local_hash}")
+
+    # Verify integrity
+    if local_hash == server_hash:
+        print("[+] Data integrity verified. No tampering detected.")
+    else:
+        print("[-] Data integrity check failed! Possible tampering or corruption.")
+
+    client_socket.close()
+
+if __name__ == "__main__":
+    start_client()
+
+
+
+# Design a Python-based experiment to analyze the performance of MD5, 
+# SHA-1, and SHA-256 hashing techniques in terms of computation time 
+# and collision resistance. Generate a dataset of random strings ranging 
+# from 50 to 100 strings, compute the hash values using each hashing 
+# technique, and measure the time taken for hash computation. Implement 
+# collision detection algorithms to identify any collisions within the 
+# hashed dataset. 
+
+import hashlib
+import random
+import string
+import time
+
+
+# -------------------------------
+# Generate random strings
+# -------------------------------
+def generate_random_strings(count=50, length=10):
+    """
+    Generate a list of random strings.
+    :param count: Number of strings to generate
+    :param length: Length of each random string
+    :return: List of random strings
+    """
+    dataset = []
+    for _ in range(count):
+        rand_str = ''.join(random.choices(string.ascii_letters + string.digits, k=length))
+        dataset.append(rand_str)
+    return dataset
+
+
+# -------------------------------
+# Hashing function
+# -------------------------------
+def compute_hash(data, algorithm='md5'):
+    """
+    Compute the hash of the given data using the specified algorithm.
+    """
+    if algorithm == 'md5':
+        return hashlib.md5(data.encode()).hexdigest()
+    elif algorithm == 'sha1':
+        return hashlib.sha1(data.encode()).hexdigest()
+    elif algorithm == 'sha256':
+        return hashlib.sha256(data.encode()).hexdigest()
+    else:
+        raise ValueError("Unsupported algorithm specified!")
+
+
+# -------------------------------
+# Collision detection
+# -------------------------------
+def detect_collisions(hashes):
+    """
+    Detect collisions in the given list of hashes.
+    :param hashes: List of hash values
+    :return: List of colliding hash values
+    """
+    seen = {}
+    collisions = []
+
+    for original, h in hashes:
+        if h in seen:
+            collisions.append((seen[h], original))  # (previous string, current string)
+        else:
+            seen[h] = original
+    return collisions
+
+
+# -------------------------------
+# Performance test
+# -------------------------------
+def analyze_hash_algorithms(dataset):
+    algorithms = ['md5', 'sha1', 'sha256']
+    results = {}
+
+    for algo in algorithms:
+        start_time = time.perf_counter()
+
+        # Compute hashes
+        hashes = [(data, compute_hash(data, algo)) for data in dataset]
+
+        end_time = time.perf_counter()
+        computation_time = end_time - start_time
+
+        # Detect collisions
+        collisions = detect_collisions(hashes)
+
+        results[algo] = {
+            "time": computation_time,
+            "hashes": hashes,
+            "collisions": collisions
+        }
+    return results
+
+
+# -------------------------------
+# Main Execution
+# -------------------------------
+if __name__ == "__main__":
+    # Generate between 50 to 100 random strings
+    count = random.randint(50, 100)
+    dataset = generate_random_strings(count=count, length=12)
+
+    print(f"[*] Generated {count} random strings for testing.\n")
+
+    # Analyze performance
+    results = analyze_hash_algorithms(dataset)
+
+    # Display results
+    print("Hashing Performance and Collision Analysis")
+    print("=" * 50)
+    for algo, data in results.items():
+        print(f"\nAlgorithm: {algo.upper()}")
+        print(f"Computation Time: {data['time']:.6f} seconds")
+        print(f"Number of Collisions: {len(data['collisions'])}")
+
+        if data['collisions']:
+            print("Collisions Detected:")
+            for pair in data['collisions']:
+                print(f"  - '{pair[0]}' and '{pair[1]}' produced the same hash!")
+
+    print("\n[*] Experiment completed successfully.")
+
+
+
+# additional1
+# Write server and client scripts where the client sends a message in multiple parts to 
+# the server, the server reassembles the message, computes the hash of the reassembled 
+# message, and sends this hash back to the client. The client then verifies the integrity 
+# of the message by comparing the received hash with the locally computed hash of the 
+# original message. 
+# server.py starts
+
+import socket
+import hashlib
+
+# Server configuration
+HOST = '127.0.0.1'  # Localhost
+PORT = 65432  # Port to listen on
+
+
+def compute_hash(message):
+    """Compute SHA-256 hash of the message"""
+    return hashlib.sha256(message.encode()).hexdigest()
+
+
+# Create a TCP socket
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind((HOST, PORT))
+    s.listen()
+    print(f"[*] Server listening on {HOST}:{PORT}")
+
+    conn, addr = s.accept()
+    with conn:
+        print(f"[+] Connected by {addr}")
+
+        # Receive message parts and reassemble
+        full_message = ''
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            # Decode and append each part
+            full_message += data.decode()
+
+        print(f"[+] Reassembled Message: {full_message}")
+
+        # Compute hash
+        message_hash = compute_hash(full_message)
+        print(f"[+] Computed SHA-256 Hash: {message_hash}")
+
+        # Send hash back to client
+        conn.sendall(message_hash.encode())
+
+# server.py ends
+
+
+import socket
+import hashlib
+import time
+
+# Server configuration
+HOST = '127.0.0.1'
+PORT = 65432
+
+def compute_hash(message):
+    """Compute SHA-256 hash of the message"""
+    return hashlib.sha256(message.encode()).hexdigest()
+
+# Message to send
+message = "This is a long message split into multiple parts for testing."
+
+# Split the message into parts (for example, 10 characters per part)
+parts = [message[i:i+10] for i in range(0, len(message), 10)]
+
+# Create a TCP socket
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.connect((HOST, PORT))
+    print("[*] Connected to server")
+
+    # Send each part
+    for part in parts:
+        s.sendall(part.encode())
+        time.sleep(0.1)  # Optional: simulate network delay
+
+    # Close the sending side to indicate end of message
+    s.shutdown(socket.SHUT_WR)
+
+    # Receive hash from server
+    server_hash = s.recv(1024).decode()
+    print(f"[+] Received Hash from Server: {server_hash}")
+
+    # Compute local hash
+    local_hash = compute_hash(message)
+    print(f"[+] Local Hash: {local_hash}")
+
+    # Verify integrity
+    if local_hash == server_hash:
+        print("[✓] Message integrity verified. No tampering detected.")
+    else:
+        print("[✗] Message integrity check failed. Data may be corrupted!")
+
+
+
