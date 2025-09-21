@@ -23,3 +23,147 @@ decrypted_padded = cipher.decrypt(ciphertext)
 decrypted_text = unpad(decrypted_padded, 8).decode()
 
 print("Decrypted Text:", decrypted_text)
+
+
+# Encrypt the message "Sensitive Information" using AES-128 with the following key:
+# "0123456789ABCDEF0123456789ABCDEF". Then decrypt the ciphertext to verify the
+# original message.
+# AES 128
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+
+# Message to encrypt
+message = "Sensitive Information"
+
+# AES-128 key (16 bytes)
+key = bytes.fromhex("0123456789ABCDEF0123456789ABCDEF")  # Convert hex to bytes
+
+# Create AES cipher in ECB mode
+cipher = AES.new(key, AES.MODE_ECB)
+
+# Pad message to multiple of 16 bytes
+padded_message = pad(message.encode(), AES.block_size)
+
+# Encrypt
+ciphertext = cipher.encrypt(padded_message)
+print("Ciphertext (hex):", ciphertext.hex())
+
+# Decrypt
+decipher = AES.new(key, AES.MODE_ECB)
+decrypted_padded = decipher.decrypt(ciphertext)
+
+# Unpad to get original message
+decrypted_message = unpad(decrypted_padded, AES.block_size).decode()
+print("Decrypted message:", decrypted_message)
+
+# Compare the encryption and decryption times for DES and AES-256 for the message
+# "Performance Testing of Encryption Algorithms". Use a standard implementation and report
+# your findings.
+
+from Crypto.Cipher import AES, DES
+from Crypto.Util.Padding import pad, unpad
+import time
+
+plaintext = "Performance Testing of Encryption Algorithms"
+
+# ===================== DES =====================
+des_key = bytes.fromhex("0123456789ABCDEF")  # 8 bytes
+des_cipher = DES.new(des_key, DES.MODE_ECB)
+
+# Padding and encryption
+des_padded = pad(plaintext.encode(), DES.block_size)
+start_des_enc = time.perf_counter()
+des_ciphertext = des_cipher.encrypt(des_padded)
+end_des_enc = time.perf_counter()
+
+# Decryption
+start_des_dec = time.perf_counter()
+des_decrypted_padded = des_cipher.decrypt(des_ciphertext)
+des_decrypted = unpad(des_decrypted_padded, DES.block_size).decode()
+end_des_dec = time.perf_counter()
+
+# ===================== AES-256 =====================
+aes_key = bytes.fromhex(
+    "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+)  # 32 bytes
+aes_cipher = AES.new(aes_key, AES.MODE_ECB)
+
+# Padding and encryption
+aes_padded = pad(plaintext.encode(), AES.block_size)
+start_aes_enc = time.perf_counter()
+aes_ciphertext = aes_cipher.encrypt(aes_padded)
+end_aes_enc = time.perf_counter()
+
+# Decryption
+start_aes_dec = time.perf_counter()
+aes_decrypted_padded = aes_cipher.decrypt(aes_ciphertext)
+aes_decrypted = unpad(aes_decrypted_padded, AES.block_size).decode()
+end_aes_dec = time.perf_counter()
+
+# ===================== Results =====================
+print("DES Ciphertext (hex):", des_ciphertext.hex())
+print("AES-256 Ciphertext (hex):", aes_ciphertext.hex())
+
+print("\nDES Decrypted Message:", des_decrypted)
+print("AES-256 Decrypted Message:", aes_decrypted)
+
+print("\nDES Encryption Time: {:.8f} sec".format(end_des_enc - start_des_enc))
+print("DES Decryption Time: {:.8f} sec".format(end_des_dec - start_des_dec))
+print("AES-256 Encryption Time: {:.8f} sec".format(end_aes_enc - start_aes_enc))
+print("AES-256 Decryption Time: {:.8f} sec".format(end_aes_dec - start_aes_dec))
+
+# Encrypt the message "Top Secret Data" using AES-192 with the key 
+# "FEDCBA9876543210FEDCBA9876543210". 
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+
+# Step 1: Define plaintext
+plaintext = "Top Secret Data"  # 16 bytes, fits AES block size
+
+# Step 2: Define a 24-byte (192-bit) key for AES-192
+key_hex = "FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210"  # 48 hex digits
+key = bytes.fromhex(key_hex)  # 24 bytes
+
+# Step 3: Create AES-192 cipher object in ECB mode
+cipher = AES.new(key, AES.MODE_ECB)
+
+# Step 4: Encrypt (pad plaintext to multiple of 16 bytes)
+padded_text = pad(plaintext.encode(), AES.block_size)
+ciphertext = cipher.encrypt(padded_text)
+print("Ciphertext (Hex):", ciphertext.hex())
+
+# Step 5: Decrypt
+decrypted_padded = cipher.decrypt(ciphertext)
+decrypted_text = unpad(decrypted_padded, AES.block_size).decode()
+print("Decrypted Text:", decrypted_text)
+
+
+
+# Encrypt the message "Classified Text" using Triple DES with the key
+# "1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF". Then decrypt the
+# ciphertext to verify the original message.
+
+from Crypto.Cipher import DES3
+from Crypto.Util.Padding import pad, unpad
+
+plaintext = "Classified Text"
+
+# Valid 3DES key (24 bytes, 3 distinct subkeys)
+key_hex = "0123456789ABCDEF23456789ABCDEF01456789ABCDEF0123"
+key = bytes.fromhex(key_hex)
+
+# Create cipher
+cipher = DES3.new(key, DES3.MODE_ECB)
+
+# Encrypt
+padded_text = pad(plaintext.encode(), DES3.block_size)
+ciphertext = cipher.encrypt(padded_text)
+print("Ciphertext (Hex):", ciphertext.hex())
+
+# Decrypt
+decrypted_padded = cipher.decrypt(ciphertext)
+decrypted_text = unpad(decrypted_padded, DES3.block_size).decode()
+print("Decrypted Text:", decrypted_text)
+
+
+
