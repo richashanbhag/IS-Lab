@@ -598,3 +598,100 @@ print(f"Encryption Time: {end_enc - start_enc:.6f} sec")
 print(f"Decryption Time: {end_dec - start_dec:.6f} sec")
 
 
+#Rabin
+import random
+import math
+
+# ---------- Key Generation ----------
+def generate_keys():
+    # Generate two large primes p and q such that p ≡ q ≡ 3 (mod 4)
+    def get_prime():
+        while True:
+            num = random.getrandbits(16)  # 16-bit prime for simplicity
+            if num % 4 == 3 and all(num % i != 0 for i in range(2, int(math.sqrt(num)) + 1)):
+                return num
+
+    p = get_prime()
+    q = get_prime()
+    while p == q:
+        q = get_prime()
+
+    n = p * q  # public key
+    return (n, p, q)
+
+# ---------- Encryption ----------
+def encrypt(m, n):
+    """Encrypt integer message m using Rabin."""
+    return pow(m, 2, n)
+
+# ---------- Decryption ----------
+def decrypt(c, p, q):
+    """Decrypt ciphertext c and return 4 possible plaintext candidates."""
+    # Compute square roots mod p and mod q
+    mp = pow(c, (p + 1) // 4, p)
+    mq = pow(c, (q + 1) // 4, q)
+
+    # Extended Euclidean Algorithm to solve CRT
+    def egcd(a, b):
+        if a == 0:
+            return (b, 0, 1)
+        g, y, x = egcd(b % a, a)
+        return (g, x - (b // a) * y, y)
+
+    # Solve using CRT
+    gcd, yp, yq = egcd(p, q)
+    n = p * q
+
+    # Four possible plaintexts
+    r1 = (yp * p * mq + yq * q * mp) % n
+    r2 = n - r1
+    r3 = (yp * p * mq - yq * q * mp) % n
+    r4 = n - r3
+
+    return [r1, r2, r3, r4]
+
+# ---------- Utility functions ----------
+def string_to_int(message):
+    """Convert string to integer."""
+    return int.from_bytes(message.encode(), 'big')
+
+def int_to_string(m_int):
+    """Convert integer back to string."""
+    try:
+        return m_int.to_bytes((m_int.bit_length() + 7) // 8, 'big').decode()
+    except UnicodeDecodeError:
+        return None
+
+# ---------- Demo ----------
+if __name__ == "__main__":
+    # Key generation
+    n, p, q = generate_keys()
+    print(f"Public key (n): {n}")
+    print(f"Private keys (p, q): {p}, {q}")
+
+    # Original message
+    message = "Hell"
+    print(f"\nOriginal Message: {message}")
+
+    # Convert message to integer
+    m_int = string_to_int(message)
+    print(f"Message as Integer: {m_int}")
+
+    # Encrypt
+    ciphertext = encrypt(m_int, n)
+    print(f"\nCiphertext: {ciphertext}")
+
+    # Decrypt
+    candidates = decrypt(ciphertext, p, q)
+    print("\nPossible Decryptions:")
+    for idx, c in enumerate(candidates, 1):
+        decoded = int_to_string(c)
+        print(f"Candidate {idx}: {decoded} ({c})")
+
+    # Find the correct plaintext automatically
+    for c in candidates:
+        decoded = int_to_string(c)
+        if decoded == message:
+            print(f"\nCorrect Decryption Found: {decoded}")
+            break
+
