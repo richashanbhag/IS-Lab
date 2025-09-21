@@ -1,0 +1,350 @@
+# SecureCorp is a large enterprise with multiple subsidiaries and business units located across
+# different geographical regions. As part of their digital transformation initiative, the IT team at
+# SecureCorp has been tasked with building a secure and scalable communication system to
+# enable seamless collaboration and information sharing between their various subsystems.
+# The enterprise system consists of the following key subsystems:
+# 1. Finance System (System A): Responsible for all financial record-keeping, accounting, and
+# reporting.
+# 2. HR System (System B): Manages employee data, payroll, and personnel-related processes.
+# 3. Supply Chain Management (System C): Coordinates the flow of goods, services, and
+# information across the organization's supply chain.
+# These subsystems need to communicate securely and exchange critical documents, such as
+# financial reports, employee contracts, and procurement orders, to ensure the enterprise's
+# overall efficiency.
+# The IT team at SecureCorp has identified the following requirements for the secure
+# communication and document signing solution:
+# 1. Secure Communication: The subsystems must be able to establish secure communication
+# channels using a combination of RSA encryption and Diffie-Hellman key exchange.
+# 2. Key Management: SecureCorp requires a robust key management system to generate,
+# distribute, and revoke keys as needed to maintain the security of the enterprise system.
+# 3. Scalability: The solution must be designed to accommodate the addition of new subsystems
+# in the future as SecureCorp continues to grow and expand its operations.
+# Implement a Python program which incorporates the requirements.
+
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP, AES
+from Crypto.Random import get_random_bytes
+from Crypto.Util.number import getPrime
+import time
+
+class SecureCommunicationSystem:
+    def __init__(self):
+        self.subsystems = {}
+        self.logs = []
+
+    def create_system(self, subsystem_id):
+        self.subsystems[subsystem_id] = {
+            'shared_key': None,
+            'private': get_random_bytes(32)  # Randomly generated private value for DH
+        }
+        self.log(f"{subsystem_id} created.")
+        
+    def log(self, message):
+        self.logs.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - {message}")
+        print(message)
+
+    def dh_key_exchange(self, sender_id, receiver_id):
+        p = getPrime(2048)  # Generate a large prime number
+        g = 2  # Use 2 as the base for DH
+
+        # Sender's private key
+
+        # Convert the sender's private key byte string to an integer
+        a = int.from_bytes(self.subsystems[sender_id]['private'], 'big')  
+        A = pow(g, a, p)  # Compute sender's public key
+
+        # Receiver's private key
+         # Convert the sender's private key byte string to an integer
+        b = int.from_bytes(self.subsystems[receiver_id]['private'], 'big')
+        B = pow(g, b, p)  # Compute receiver's public key
+
+        # Compute the shared secret
+        shared_secret_sender = pow(B, a, p)  # Sender computes shared secret
+        shared_secret_receiver = pow(A, b, p)  # Receiver computes shared secret
+
+        # Check if both computed shared secrets match
+        if shared_secret_sender == shared_secret_receiver:
+            # Reduce key size to fit AES requirements (16 bytes)
+            shared_key = shared_secret_sender % (2 ** 128)
+            self.subsystems[sender_id]['shared_key'] = shared_key
+            self.subsystems[receiver_id]['shared_key'] = shared_key
+            self.log(f"Shared key established between {sender_id} and {receiver_id}.")
+        else:
+            self.log("Failed to establish shared key.")
+
+    def encrypt_message(self, sender_id, receiver_id, message):
+        # Ensure sender has a shared key
+        if sender_id not in self.subsystems or self.subsystems[sender_id]['shared_key'] is None:
+            self.log(f"No shared key found for {sender_id}.")
+            return None
+
+        # Use the receiver's shared key for encryption
+        shared_key = self.subsystems[receiver_id]['shared_key'].to_bytes(16, 'big')  
+        cipher_aes = AES.new(shared_key, AES.MODE_EAX)  # Create a new AES cipher object in EAX mode
+        ciphertext, tag = cipher_aes.encrypt_and_digest(message.encode())  # Encrypt the message and generate a tag
+        # Return the concatenated nonce, tag, and ciphertext for decryption
+        return cipher_aes.nonce + tag + ciphertext  
+
+    def decrypt_message(self, receiver_id, encrypted_message):
+        # Ensure receiver has a shared key
+        if receiver_id not in self.subsystems or self.subsystems[receiver_id]['shared_key'] is None:
+            self.log(f"No shared key found for {receiver_id}.")
+            return None
+
+        shared_key = self.subsystems[receiver_id]['shared_key'].to_bytes(16, 'big')  
+        nonce = encrypted_message[:16]  # Extract the nonce from the encrypted message
+        tag = encrypted_message[16:32]  # Extract the tag
+        ciphertext = encrypted_message[32:]  # Extract the actual ciphertext
+
+        # Create a new AES cipher object using the shared key and the extracted nonce
+        cipher_aes = AES.new(shared_key, AES.MODE_EAX, nonce=nonce)  
+        try:
+            original_message = cipher_aes.decrypt_and_verify(ciphertext, tag).decode()
+            self.log(f"Message decrypted for {receiver_id}.")
+            return original_message  # Return the original decrypted message
+        except ValueError:
+            self.log("Decryption failed: MAC check failed.")
+            return None
+
+    def revoke_key(self, subsystem_id):
+        # Revoke the keys associated with a given subsystem
+        if subsystem_id in self.subsystems:
+            del self.subsystems[subsystem_id]  # Remove subsystem from the dictionary
+            self.log(f"Keys revoked for subsystem {subsystem_id}.")
+
+# Example Usage:
+secure_system = SecureCommunicationSystem()
+
+# Generate RSA keys for subsystems
+secure_system.create_system("Finance System")
+secure_system.create_system("HR System")
+secure_system.create_system("Supply Chain Management")
+
+# Establish secure communication using Diffie-Hellman key exchange
+secure_system.dh_key_exchange("Finance System", "HR System")
+secure_system.dh_key_exchange("Supply Chain Management", "HR System")
+secure_system.dh_key_exchange("Supply Chain Management", "Finance System")
+
+# Encrypt a message from Finance to HR
+encrypted_msg = secure_system.encrypt_message("Finance System", "HR System", "Confidential financial report.")
+
+# Decrypt the message at HR
+original_message = secure_system.decrypt_message("HR System", encrypted_msg)
+if original_message is not None:
+    print(f"Decrypted Message: {original_message}")
+else:
+    print("Failed to decrypt the message.")
+    
+# Revoking keys (if necessary)
+secure_system.revoke_key("Finance System")
+
+
+
+# HealthCare Inc., a leading healthcare provider, has implemented a secure patient data
+# management system using the Rabin cryptosystem. The system allows authorized healthcare
+# 38
+# Database and Domain Name Servers (DNS)
+# professionals to securely access and manage patient records across multiple hospitals and
+# clinics within the organization. Implement a Python-based centralized key management
+# service that can:
+# • Key Generation: Generate public and private key pairs for each hospital and clinic using
+# the Rabin cryptosystem. The key size should be configurable (e.g., 1024 bits).
+# • Key Distribution: Provide a secure API for hospitals and clinics to request and receive
+# their public and private key pairs.
+# • Key Revocation: Implement a process to revoke and update the keys of a hospital or
+# clinic when necessary (e.g., when a facility is closed or compromised).
+# • Key Renewal: Automatically renew the keys of all hospitals and clinics at regular
+# intervals (e.g., every 12 months) to maintain the security of the patient data management
+# system.
+# • Secure Storage: Securely store the private keys of all hospitals and clinics, ensuring that
+# they are not accessible to unauthorized parties.
+# • Auditing and Logging: Maintain detailed logs of all key management operations, such
+# as key generation, distribution, revocation, and renewal, to enable auditing and
+# compliance reporting.
+# • Regulatory Compliance: Ensure that the key management service and its operations are
+# compliant with relevant data privacy regulations (e.g., HIPAA).
+# • Perform a trade-off analysis to compare the workings of Rabin and RSA.
+
+import random
+import json
+import os
+from datetime import datetime, timedelta
+from sympy import isprime
+
+# Directory for storing keys and logs
+
+
+KEY_DIRECTORY = 'C:/Users/HP/OneDrive/Desktop/Coding/Python/Python learning/keys'  # change path
+
+# Key expiry interval set to 365 days
+KEY_EXPIRY_INTERVAL = timedelta(days=365)
+
+# Ensure the key directory exists; if not, create it
+if not os.path.exists(KEY_DIRECTORY):
+    os.makedirs(KEY_DIRECTORY)
+
+
+# Function to generate a large prime number
+def generate_large_prime(bits):
+    while True:
+        # Generate a random number with the specified number of bits
+        p = random.getrandbits(bits)
+        # Check if the number is prime
+        if isprime(p):
+            return p  # Return the prime number if found
+
+
+# Rabin key pair generation
+def rabin_key_pair(bits):
+    # Generate two large prime numbers p and q
+    p = generate_large_prime(bits // 2)
+    q = generate_large_prime(bits // 2)
+    n = p * q  # Calculate n as the product of p and q
+    public_key = n  # Public key is n
+    private_key = (p, q)  # Private key is a tuple of (p, q)
+
+    return public_key, private_key  # Return the keys
+
+
+# Rabin encryption function
+def encrypt_rabin(public_key, plaintext):
+    n = public_key  # Public key
+    # Encrypt plaintext using Rabin encryption formula
+    return (plaintext ** 2) % n
+
+
+# Rabin decryption function
+def decrypt_rabin(private_key, ciphertext):
+    p, q = private_key  # Extract p and q from the private key
+    n = p * q  # Calculate n
+
+    # Calculate square roots of ciphertext modulo p and q
+    sqrt_p1 = pow(ciphertext, (p + 1) // 4, p)
+    sqrt_p2 = (p - sqrt_p1) % p
+    sqrt_q1 = pow(ciphertext, (q + 1) // 4, q)
+    sqrt_q2 = (q - sqrt_q1) % q
+
+    # Combine the results to get all possible plaintext candidates
+    plaintext_candidates = [
+        (sqrt_p1 * sqrt_q1) % n,
+        (sqrt_p1 * sqrt_q2) % n,
+        (sqrt_p2 * sqrt_q1) % n,
+        (sqrt_p2 * sqrt_q2) % n
+    ]
+
+    return plaintext_candidates  # Return the candidates
+
+
+# Class to manage key generation, storage, and revocation
+class KeyManager:
+    def __init__(self):
+        self.keys = {}  # Dictionary to store keys
+        self.load_keys()  # Load existing keys from the file
+
+    # Key pair generation for a facility
+    def generate_key_pair(self, facility_id, bits=1024):
+        public_key, private_key = rabin_key_pair(bits)  # Generate key pair
+        # Store keys along with metadata (creation and expiry dates)
+        self.keys[facility_id] = {
+            'public_key': public_key,
+            'private_key': private_key,
+            'creation_date': datetime.now().isoformat(),
+            'expiry_date': (datetime.now() + KEY_EXPIRY_INTERVAL).isoformat()
+        }
+        self.save_keys()  # Save the updated keys to a file
+        # Log the key generation event
+        self.audit_log('Key Generation', f"Generated key pair for facility {facility_id}")
+        return public_key, private_key  # Return the generated keys
+
+    # Retrieve the key pair for a specific facility
+    def get_key_pair(self, facility_id):
+        key_data = self.keys.get(facility_id)  # Get key data for the facility
+        # Check if the key is found and not expired
+        if key_data and datetime.now() < datetime.fromisoformat(key_data['expiry_date']):
+            return key_data['public_key'], key_data['private_key']  # Return keys
+        else:
+            raise ValueError("Key not found or expired")  # Raise an error if not found or expired
+
+    # Revoke the key for a specific facility
+    def revoke_key(self, facility_id):
+        if facility_id in self.keys:
+            del self.keys[facility_id]  # Delete the key for the facility
+            self.save_keys()  # Save the updated keys to a file
+            # Log the key revocation event
+            self.audit_log('Key Revocation', f"Revoked key pair for facility {facility_id}")
+        else:
+            raise ValueError("Key not found")  # Raise an error if not found
+
+    # Renew keys for all facilities if expired
+    def renew_keys(self):
+        for facility_id, key_data in list(self.keys.items()):
+            # Check if the key is expired
+            if datetime.now() >= datetime.fromisoformat(key_data['expiry_date']):
+                self.generate_key_pair(facility_id)  # Re-generate for renewal
+                # Log the key renewal event
+                self.audit_log('Key Renewal', f"Renewed key pair for facility {facility_id}")
+
+    # Save keys to a JSON file
+    def save_keys(self):
+        with open(os.path.join(KEY_DIRECTORY, 'keys.json'), 'w') as f:
+            json.dump(self.keys, f, indent=4)  # Write the keys to the file in JSON format
+
+    # Load keys from a JSON file
+    def load_keys(self):
+        key_file = os.path.join(KEY_DIRECTORY, 'keys.json')  # Path to the key file
+        if os.path.exists(key_file):
+            with open(key_file, 'r') as f:
+                self.keys = json.load(f)  # Load keys from the file
+
+    # Audit logging function
+    def audit_log(self, action, details):
+        # Append log entries to the audit log file
+        with open(os.path.join(KEY_DIRECTORY, 'audit.log'), 'a') as f:
+            f.write(f"{datetime.now()} - {action}: {details}\n")
+
+
+# Example Usage
+if __name__ == "__main__":
+    key_manager = KeyManager()  # Initialize the key manager
+
+    facility_id = 'hospital_123'  # Example facility ID
+    # Generate key pair for the facility
+    public_key, private_key = key_manager.generate_key_pair(facility_id)
+    print(f"Generated keys for {facility_id}:")
+    print(f"Public Key: {public_key}")
+    print(f"Private Key: {private_key}")
+
+    # Get key pair and demonstrate encryption/decryption
+    pub_key, priv_key = key_manager.get_key_pair(facility_id)  # Retrieve the keys
+    plaintext = 12345  # Example plaintext
+    # Encrypt the plaintext
+    encrypted = encrypt_rabin(pub_key, plaintext)
+    print(f"Encrypted: {encrypted}")
+
+    # Decrypt the ciphertext
+    decrypted_candidates = decrypt_rabin(priv_key, encrypted)
+    print(f"Decrypted candidates: {decrypted_candidates}")
+
+    # Check which candidate matches the original plaintext
+    for pt in decrypted_candidates:
+        if pt == plaintext:
+            decrypted_plaintext = pt
+            break
+        else:
+            decrypted_plaintext = None
+
+    # Verify if decryption was successful
+    if decrypted_plaintext is not None:
+        print(f"Decrypted to original plaintext: {decrypted_plaintext}")
+    else:
+        print("Decryption did not yield the original plaintext.")
+
+    # Renew keys for all facilities
+    key_manager.renew_keys()
+
+    # Revoke the key for the facility
+    key_manager.revoke_key(facility_id)
+
+    # Display keys to verify revocation
+    print("Keys after revocation:")
+    print(key_manager.keys)
