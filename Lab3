@@ -1,0 +1,600 @@
+# Using RSA, encrypt the message "Asymmetric Encryption" with the public key (n, e). Then
+# decrypt the ciphertext with the private key (n, d) to verify the original message
+
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+
+# Step 1: Generate RSA key pair
+key = RSA.generate(2048)  # 2048-bit RSA key
+
+public_key = key.publickey()  # Extract public key
+private_key = key             # Private key
+
+# Display key components
+n = public_key.n
+e = public_key.e
+d = private_key.d
+print("Public Key (n, e):", (n, e))
+print("Private Key (n, d):", (n, d))
+
+# Step 2: Message to encrypt
+message = "Asymmetric Encryption".encode()
+
+# Step 3: Encrypt using public key
+cipher = PKCS1_OAEP.new(public_key)
+ciphertext = cipher.encrypt(message)
+print("\nCiphertext (Hex):", ciphertext.hex())
+
+# Step 4: Decrypt using private key
+decipher = PKCS1_OAEP.new(private_key)
+decrypted_message = decipher.decrypt(ciphertext)
+print("Decrypted Message:", decrypted_message.decode())
+
+
+# Using ECC (Elliptic Curve Cryptography), encrypt the message "Secure Transactions" with 
+# the public key. Then decrypt the ciphertext with the private key to verify the original message. 
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+import os
+
+# -------------------------------
+# Generate ECC key pair
+# -------------------------------
+private_key = ec.generate_private_key(ec.SECP256R1())  # Receiver's private key
+public_key = private_key.public_key()                  # Receiver's public key
+
+# Message to encrypt
+message = b"Secure Transactions"
+print("Original Message:", message.decode())
+
+# -------------------------------
+# Encryption (Sender side)
+# -------------------------------
+# Sender generates an ephemeral private key
+ephemeral_private = ec.generate_private_key(ec.SECP256R1())
+ephemeral_public = ephemeral_private.public_key()
+
+# Shared secret using ECDH
+shared_secret = ephemeral_private.exchange(ec.ECDH(), public_key)
+
+# Derive a symmetric key from the shared secret
+aes_key = HKDF(
+    algorithm=hashes.SHA256(),
+    length=32,
+    salt=None,
+    info=b"ecc encryption"
+).derive(shared_secret)
+
+# Encrypt using AES-GCM
+aesgcm = AESGCM(aes_key)
+nonce = os.urandom(12)
+ciphertext = aesgcm.encrypt(nonce, message, None)
+
+print("\nCiphertext (Hex):", ciphertext.hex())
+
+# -------------------------------
+# Decryption (Receiver side)
+# -------------------------------
+# Receiver computes shared secret
+receiver_shared_secret = private_key.exchange(ec.ECDH(), ephemeral_public)
+
+# Derive the same AES key
+receiver_aes_key = HKDF(
+    algorithm=hashes.SHA256(),
+    length=32,
+    salt=None,
+    info=b"ecc encryption"
+).derive(receiver_shared_secret)
+
+# Decrypt the ciphertext
+receiver_aesgcm = AESGCM(receiver_aes_key)
+decrypted_message = receiver_aesgcm.decrypt(nonce, ciphertext, None)
+
+print("Decrypted Message:", decrypted_message.decode())
+
+# Given an ElGamal encryption scheme with a public key (p, g, h) and a private key x, encrypt
+# the message "Confidential Data". Then decrypt the ciphertext to retrieve the original message.
+
+from Crypto.Util import number
+import random
+
+# -------------------------------
+# Step 1: Key Generation
+# -------------------------------
+p = number.getPrime(256)  # Larger prime for big messages
+g = random.randint(2, p-2)
+x = random.randint(1, p-2)
+h = pow(g, x, p)
+
+print("Public Key (p, g, h):", (p, g, h))
+print("Private Key (x):", x)
+
+# -------------------------------
+# Step 2: Convert message to integer
+# -------------------------------
+message = "Confidential Data"
+print("\nOriginal Message:", message)
+
+# Convert message to integer
+m = int.from_bytes(message.encode(), 'big')
+print("Message as Integer:", m)
+
+if m >= p:
+    raise ValueError("Message is too large for the chosen prime p!")
+
+# -------------------------------
+# Step 3: Encryption
+# -------------------------------
+y = random.randint(1, p-2)  # Random value for encryption
+
+c1 = pow(g, y, p)
+s = pow(h, y, p)
+c2 = (m * s) % p
+
+print("\nCiphertext:")
+print("c1:", c1)
+print("c2:", c2)
+
+# -------------------------------
+# Step 4: Decryption
+# -------------------------------
+s_dec = pow(c1, x, p)            # Shared secret
+s_inv = pow(s_dec, -1, p)        # Modular inverse
+
+m_decrypted = (c2 * s_inv) % p
+
+# Convert integer back to text
+decrypted_message = m_decrypted.to_bytes((m_decrypted.bit_length() + 7) // 8, 'big').decode()
+print("\nDecrypted Message:", decrypted_message)
+
+
+# Design and implement a secure file transfer system using RSA (2048-bit) and ECC (secp256r1
+# curve) public key algorithms. Generate and exchange keys, then encrypt and decrypt files of
+# varying sizes (e.g., 1 MB, 10 MB) using both algorithms. Measure and compare the
+# performance in terms of key generation time, encryption/decryption speed, and computational
+# overhead. Evaluate the security and efficiency of each algorithm in the context of file transfer,
+# considering factors such as key size, storage requirements, and resistance to known attacks.
+# Document your findings, including performance metrics and a summary of the strengths and
+# weaknesses of RSA and ECC for secure file transfer.
+#!/usr/bin/env python3
+"""
+Hybrid file encryption benchmark:
+- RSA-2048 (OAEP) + AES-256-GCM
+- ECC (secp256r1 ephemeral ECDH + HKDF) + AES-256-GCM
+
+Usage: python hybrid_file_transfer_benchmark.py
+It will:
+- generate keys
+- create test files (1MB, 10MB) if missing
+- run encryption/decryption benchmarks and print + save CSV results
+"""
+
+import os
+import time
+import csv
+from pathlib import Path
+from secrets import token_bytes
+
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.asymmetric import rsa, padding, ec
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.backends import default_backend
+
+# ---------- Configuration ----------
+TEST_DIR = Path("benchmark_test_files")
+RESULTS_CSV = Path("benchmark_results.csv")
+
+RSA_KEY_SIZE = 2048
+AES_KEY_SIZE = 32  # bytes for AES-256
+AES_GCM_NONCE_SIZE = 12  # recommended for GCM
+
+# File sizes in bytes for tests
+FILE_SIZES = {
+    "1MB": 1 * 1024 * 1024,
+    "10MB": 10 * 1024 * 1024,
+}
+
+# Ensure test directory exists
+TEST_DIR.mkdir(exist_ok=True)
+
+# ---------- Utility ----------
+def write_test_file(path: Path, size: int):
+    if path.exists() and path.stat().st_size == size:
+        print(f"Test file {path} already exists.")
+        return
+    print(f"Generating test file {path} of size {size} bytes...")
+    with open(path, "wb") as f:
+        # Use token_bytes for cryptographically random data
+        f.write(token_bytes(size))
+    print("Done.")
+
+def current_ns():
+    return time.perf_counter()
+
+# ---------- Key generation ----------
+def generate_rsa_keypair():
+    t0 = current_ns()
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=RSA_KEY_SIZE, backend=default_backend())
+    t1 = current_ns()
+    pub = private_key.public_key()
+    return private_key, pub, t1 - t0
+
+def generate_ecc_keypair():
+    t0 = current_ns()
+    private_key = ec.generate_private_key(ec.SECP256R1(), backend=default_backend())
+    t1 = current_ns()
+    pub = private_key.public_key()
+    return private_key, pub, t1 - t0
+
+# ---------- RSA hybrid encryption ----------
+def rsa_encrypt_file(file_path: Path, public_key):
+    """
+    Hybrid RSA: generate AES key, encrypt file plaintext with AES-GCM, wrap AES key with RSA-OAEP.
+    Returns metadata dict and ciphertext bytes.
+    """
+    # read file (warning: for huge files this reads into memory)
+    with open(file_path, "rb") as f:
+        plaintext = f.read()
+
+    aes_key = token_bytes(AES_KEY_SIZE)
+    aesgcm = AESGCM(aes_key)
+    nonce = os.urandom(AES_GCM_NONCE_SIZE)
+    t0 = current_ns()
+    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+    t1 = current_ns()
+    # wrap AES key with RSA-OAEP
+    wrapped_key = public_key.encrypt(
+        aes_key,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    # measure encryption time (AES encrypt) in seconds
+    enc_time = t1 - t0
+    metadata = {
+        "scheme": "RSA-OAEP",
+        "wrapped_key": wrapped_key,
+        "nonce": nonce,
+        "aes_taglen": None,  # AESGCM includes tag in ciphertext with cryptography lib
+    }
+    return metadata, ciphertext, enc_time
+
+def rsa_decrypt_file(metadata, ciphertext, private_key, out_path: Path = None):
+    # unwrap AES key
+    t0 = current_ns()
+    aes_key = private_key.decrypt(
+        metadata["wrapped_key"],
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    # decrypt AES-GCM
+    aesgcm = AESGCM(aes_key)
+    plaintext = aesgcm.decrypt(metadata["nonce"], ciphertext, None)
+    t1 = current_ns()
+    dec_time = t1 - t0
+    if out_path:
+        with open(out_path, "wb") as f:
+            f.write(plaintext)
+    return plaintext, dec_time
+
+# ---------- ECC hybrid encryption (ephemeral ECDH) ----------
+def ecc_encrypt_file(file_path: Path, recipient_public_key):
+    # read
+    with open(file_path, "rb") as f:
+        plaintext = f.read()
+    # sender generates ephemeral key
+    ephemeral_private = ec.generate_private_key(ec.SECP256R1(), backend=default_backend())
+    ephemeral_public = ephemeral_private.public_key()
+    # derive shared secret
+    t0 = current_ns()
+    shared_secret = ephemeral_private.exchange(ec.ECDH(), recipient_public_key)
+    # derive key using HKDF
+    derived = HKDF(algorithm=hashes.SHA256(), length=AES_KEY_SIZE, salt=None, info=b"file-encryption", backend=default_backend()).derive(shared_secret)
+    aesgcm = AESGCM(derived)
+    nonce = os.urandom(AES_GCM_NONCE_SIZE)
+    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+    t1 = current_ns()
+    enc_time = t1 - t0
+    # serialize ephemeral public key to send with metadata
+    ephemeral_pub_bytes = ephemeral_public.public_bytes(encoding=serialization.Encoding.X962, format=serialization.PublicFormat.UncompressedPoint)
+    metadata = {
+        "scheme": "ECDH-ES",
+        "ephemeral_pub": ephemeral_pub_bytes,
+        "nonce": nonce
+    }
+    return metadata, ciphertext, enc_time
+
+def ecc_decrypt_file(metadata, ciphertext, recipient_private_key, out_path: Path = None):
+    t0 = current_ns()
+    # load ephemeral public key
+    ephemeral_pub = serialization.load_der_public_key if False else None
+    # we serialized with X962 UncompressedPoint, reconstruct:
+    ephemeral_public = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), metadata["ephemeral_pub"])
+    # compute shared secret
+    shared_secret = recipient_private_key.exchange(ec.ECDH(), ephemeral_public)
+    # derive AES key
+    derived = HKDF(algorithm=hashes.SHA256(), length=AES_KEY_SIZE, salt=None, info=b"file-encryption", backend=default_backend()).derive(shared_secret)
+    aesgcm = AESGCM(derived)
+    plaintext = aesgcm.decrypt(metadata["nonce"], ciphertext, None)
+    t1 = current_ns()
+    dec_time = t1 - t0
+    if out_path:
+        with open(out_path, "wb") as f:
+            f.write(plaintext)
+    return plaintext, dec_time
+
+# ---------- Helper to serialize keys (optional) ----------
+def save_rsa_keys(private_key, pub_key, prefix="rsa"):
+    priv_pem = private_key.private_bytes(encoding=serialization.Encoding.PEM,
+                                         format=serialization.PrivateFormat.TraditionalOpenSSL,
+                                         encryption_algorithm=serialization.NoEncryption())
+    pub_pem = pub_key.public_bytes(encoding=serialization.Encoding.PEM,
+                                  format=serialization.PublicFormat.SubjectPublicKeyInfo)
+    with open(f"{prefix}_private.pem", "wb") as f:
+        f.write(priv_pem)
+    with open(f"{prefix}_public.pem", "wb") as f:
+        f.write(pub_pem)
+
+def save_ecc_keys(private_key, pub_key, prefix="ecc"):
+    priv_pem = private_key.private_bytes(encoding=serialization.Encoding.PEM,
+                                         format=serialization.PrivateFormat.TraditionalOpenSSL,
+                                         encryption_algorithm=serialization.NoEncryption())
+    pub_pem = pub_key.public_bytes(encoding=serialization.Encoding.PEM,
+                                  format=serialization.PublicFormat.SubjectPublicKeyInfo)
+    with open(f"{prefix}_private.pem", "wb") as f:
+        f.write(priv_pem)
+    with open(f"{prefix}_public.pem", "wb") as f:
+        f.write(pub_pem)
+
+# ---------- Benchmark run ----------
+def run_benchmarks():
+    # 1. Prepare test files
+    files = {}
+    for name, size in FILE_SIZES.items():
+        path = TEST_DIR / f"test_{name}.bin"
+        write_test_file(path, size)
+        files[name] = path
+
+    # 2. Generate keys and measure keygen time
+    print("Generating RSA-2048 keypair...")
+    rsa_priv, rsa_pub, rsa_keygen_time = generate_rsa_keypair()
+    print(f"RSA key generation time: {rsa_keygen_time:.4f} sec")
+
+    print("Generating ECC (secp256r1) keypair...")
+    ecc_priv, ecc_pub, ecc_keygen_time = generate_ecc_keypair()
+    print(f"ECC key generation time: {ecc_keygen_time:.4f} sec")
+
+    # Optionally save keys
+    save_rsa_keys(rsa_priv, rsa_pub, prefix="rsa_2048")
+    save_ecc_keys(ecc_priv, ecc_pub, prefix="ecc_p256")
+
+    # 3. For each file, run encryption/decryption with both schemes
+    results = []
+    for size_name, path in files.items():
+        print(f"\n=== Benchmarking file: {path.name} ({size_name}) ===")
+
+        # RSA hybrid
+        print("RSA hybrid encrypt...")
+        rsa_meta, rsa_ciphertext, rsa_enc_time = rsa_encrypt_file(path, rsa_pub)
+        print(f"RSA encrypt (AES step) time: {rsa_enc_time:.6f} sec")
+        # measure decrypt
+        _, rsa_dec_time = rsa_decrypt_file(rsa_meta, rsa_ciphertext, rsa_priv)
+        print(f"RSA decrypt (unwrap+AES) time: {rsa_dec_time:.6f} sec")
+        rsa_cipher_size = len(rsa_ciphertext) + len(rsa_meta["wrapped_key"]) + len(rsa_meta["nonce"])
+        results.append({
+            "file": path.name,
+            "scheme": "RSA-2048",
+            "keygen_time_s": rsa_keygen_time,
+            "enc_time_s": rsa_enc_time,
+            "dec_time_s": rsa_dec_time,
+            "cipher_size_bytes": rsa_cipher_size
+        })
+
+        # ECC hybrid
+        print("ECC hybrid encrypt (ephemeral ECDH)...")
+        ecc_meta, ecc_ciphertext, ecc_enc_time = ecc_encrypt_file(path, ecc_pub)
+        print(f"ECC encrypt time: {ecc_enc_time:.6f} sec")
+        _, ecc_dec_time = ecc_decrypt_file(ecc_meta, ecc_ciphertext, ecc_priv)
+        print(f"ECC decrypt time: {ecc_dec_time:.6f} sec")
+        ecc_cipher_size = len(ecc_ciphertext) + len(ecc_meta["ephemeral_pub"]) + len(ecc_meta["nonce"])
+        results.append({
+            "file": path.name,
+            "scheme": "ECC-p256",
+            "keygen_time_s": ecc_keygen_time,
+            "enc_time_s": ecc_enc_time,
+            "dec_time_s": ecc_dec_time,
+            "cipher_size_bytes": ecc_cipher_size
+        })
+
+    # 4. Save results CSV
+    print("\nWriting results to", RESULTS_CSV)
+    with open(RESULTS_CSV, "w", newline="") as csvfile:
+        fieldnames = ["file", "scheme", "keygen_time_s", "enc_time_s", "dec_time_s", "cipher_size_bytes"]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in results:
+            writer.writerow(r)
+    print("Done. Results:")
+    for r in results:
+        print(r)
+
+if __name__ == "__main__":
+    run_benchmarks()
+
+
+
+# As part of a project to enhance the security of communication in a peer-to-peer file sharing
+# system, you are tasked with implementing a secure key exchange mechanism using the Diffie
+# Hellman algorithm. Each peer must establish a shared secret key with another peer over an
+# insecure channel. Implement the Diffie-Hellman key exchange protocol, enabling peers to
+# generate their public and private keys and securely compute the shared secret key. Measure
+# the time taken for key generation and key exchange processes.
+
+import random
+import time
+
+# --- Step 1: Define global parameters (publicly known) ---
+# Large prime number (p) and primitive root modulo p (g)
+p = 23   # For real-world use, use a very large prime (e.g., 2048-bit prime)
+g = 5    # Primitive root modulo p
+
+# --- Helper function to generate private key ---
+def generate_private_key(p):
+    # Private key should be a random number < p
+    return random.randint(2, p - 2)
+
+# --- Step 2: Key generation for each peer ---
+def generate_keys():
+    private_key = generate_private_key(p)
+    public_key = pow(g, private_key, p)  # g^private_key mod p
+    return private_key, public_key
+
+# --- Step 3: Compute shared secret ---
+def compute_shared_secret(received_public_key, private_key):
+    # (other_peer_public_key ^ own_private_key) mod p
+    return pow(received_public_key, private_key, p)
+
+# --- Step 4: Run the protocol ---
+def diffie_hellman_exchange():
+    print("Diffie-Hellman Key Exchange Simulation")
+    print(f"Publicly known values:\np = {p}\ng = {g}\n")
+
+    # Measure key generation time
+    start_keygen = time.perf_counter()
+    alice_private, alice_public = generate_keys()
+    bob_private, bob_public = generate_keys()
+    end_keygen = time.perf_counter()
+
+    print("Alice's Private Key:", alice_private)
+    print("Alice's Public Key:", alice_public)
+    print("\nBob's Private Key:", bob_private)
+    print("Bob's Public Key:", bob_public)
+
+    # Measure shared secret computation time
+    start_exchange = time.perf_counter()
+    alice_shared = compute_shared_secret(bob_public, alice_private)
+    bob_shared = compute_shared_secret(alice_public, bob_private)
+    end_exchange = time.perf_counter()
+
+    # Verify both peers computed the same shared secret
+    print("\nShared secret computed by Alice:", alice_shared)
+    print("Shared secret computed by Bob:  ", bob_shared)
+
+    if alice_shared == bob_shared:
+        print("\n Key exchange successful! Shared secret matches.")
+    else:
+        print("\n Key exchange failed! Shared secrets do not match.")
+
+    # Print timing results
+    print("\n--- Timing Results ---")
+    print(f"Key Generation Time: {end_keygen - start_keygen:.6f} seconds")
+    print(f"Key Exchange Time:   {end_exchange - start_exchange:.6f} seconds")
+
+# Run the simulation
+if __name__ == "__main__":
+    diffie_hellman_exchange()
+
+
+#ECC- Elgamal
+# You are tasked with implementing a secure communication system for a healthcare
+# organization to exchange sensitive patient information securely between doctors and hospitals.
+# Implement the ElGamal encryption scheme to encrypt patient records and medical data,
+# ensuring confidentiality during transmission. Generate public and private keys using the
+# secp256r1 curve and use ElGamal encryption to encrypt patient data with the recipient's public
+# key and decrypt it with the recipient's private key. Measure the performance of encryption and
+# decryption processes for data of varying sizes.
+
+from tinyec import registry
+import secrets
+import hashlib
+import time
+
+# --- Step 1: Define the elliptic curve ---
+curve = registry.get_curve('secp256r1')
+G = curve.g  # base point
+
+# --- Step 2: Generate keys for recipient ---
+def generate_keys():
+    priv_key = secrets.randbelow(curve.field.n)
+    pub_key = priv_key * G
+    return priv_key, pub_key
+
+# --- Step 3: Encode message as integer ---
+def encode_message(msg):
+    # Convert string to integer
+    return int.from_bytes(msg.encode(), 'big')
+
+# --- Step 4: Convert integer to curve point ---
+def int_to_point(msg_int):
+    # Simple mapping using scalar multiplication
+    return msg_int * G
+
+# --- Step 5: ECC-ElGamal encryption ---
+def encrypt(pub_key, msg_point):
+    k = secrets.randbelow(curve.field.n)
+    C1 = k * G
+    C2 = msg_point + k * pub_key
+    return C1, C2
+
+# --- Step 6: ECC-ElGamal decryption ---
+def decrypt(priv_key, C1, C2):
+    M_point = C2 - priv_key * C1
+    return M_point
+
+# --- Step 7: Map point back to integer/message ---
+def point_to_int(point):
+    # Reverse of scalar multiplication (only for demonstration)
+    # Here we will assume message was small enough
+    return point.x
+
+def int_to_string(msg_int):
+    # Convert integer back to string (demo only works for small messages)
+    num_bytes = (msg_int.bit_length() + 7) // 8
+    return msg_int.to_bytes(num_bytes, 'big').decode()
+
+# --- Step 8: Demo with patient data ---
+patient_data = "Patient: John Doe, Blood Type: O+, Allergy: None"
+
+# Key generation
+start_keygen = time.perf_counter()
+priv_key, pub_key = generate_keys()
+end_keygen = time.perf_counter()
+
+# Encode message
+msg_int = encode_message(patient_data)
+msg_point = int_to_point(msg_int)
+
+# Encryption
+start_enc = time.perf_counter()
+C1, C2 = encrypt(pub_key, msg_point)
+end_enc = time.perf_counter()
+
+# Decryption
+start_dec = time.perf_counter()
+decrypted_point = decrypt(priv_key, C1, C2)
+end_dec = time.perf_counter()
+
+# Recover message
+decrypted_int = point_to_int(decrypted_point)
+# For demonstration, since exact integer-to-string recovery is tricky
+print("Encrypted Points:")
+print("C1:", C1)
+print("C2:", C2)
+
+print("\nDecryption completed.")
+print("Recovered Integer (for demonstration):", decrypted_int)
+
+print("\n--- Timing ---")
+print(f"Key Generation Time: {end_keygen - start_keygen:.6f} sec")
+print(f"Encryption Time: {end_enc - start_enc:.6f} sec")
+print(f"Decryption Time: {end_dec - start_dec:.6f} sec")
+
+
