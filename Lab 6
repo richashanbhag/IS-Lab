@@ -1,0 +1,462 @@
+#RSA signature verification
+
+from Crypto.PublicKey import RSA
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
+
+# Generate RSA key pair
+key = RSA.generate(2048)
+private_key = key
+public_key = key.publickey()
+
+# Document/message to sign
+message = b"This is a legal document from Alice."
+h = SHA256.new(message)
+
+# Alice signs the message using her private key
+signature = pkcs1_15.new(private_key).sign(h)
+print("Digital Signature:", signature.hex())
+
+# Bob verifies the signature using Alice's public key
+try:
+    pkcs1_15.new(public_key).verify(h, signature)
+    print("Signature is valid. Verified Alice's authenticity.")
+except (ValueError, TypeError):
+    print("Signature is invalid. Document may be tampered.")
+
+
+# Schnorr signature
+
+import hashlib
+import random
+from sympy import isprime, mod_inverse
+
+
+# Helper function to generate a large prime number
+def generate_large_prime(bits=256):
+    """
+    Generate a random large prime number.
+
+    Args:
+        bits (int): The number of bits for the prime number.
+
+    Returns:
+        int: A large prime number.
+    """
+    while True:
+        prime_candidate = random.getrandbits(bits)  # Generate a random number with specified bits
+        if isprime(prime_candidate):  # Check if the candidate is prime
+            return prime_candidate  # Return the prime candidate if it is prime
+
+
+# Schnorr Key Generation
+def schnorr_keygen(p_bits=256):
+    """
+    Generate Schnorr public and private keys.
+
+    Args:
+        p_bits (int): The number of bits for the prime number p.
+
+    Returns:
+        tuple: A tuple containing the public key (p, q, g, y) and private key x.
+    """
+    while True:
+        p = generate_large_prime(p_bits)  # Generate a large prime number p
+        q = (p - 1) // 2  # Calculate a safe prime q
+        if isprime(q):  # Check if q is also prime (safe prime check)
+            break
+
+    # Choose a generator g that has an order of q
+    while True:
+        h = random.randint(2, p - 2)
+        g = pow(h, 2, p)  # Ensure g has order q
+        if g != 1:
+            break
+
+    x = random.randint(1, q)  # Generate a private key x
+    y = pow(g, x, p)  # Compute public key component y = g^x mod p
+    return (p, q, g, y), x  # Return public and private keys
+
+
+# Schnorr Sign
+def schnorr_sign(message, private_key, p, q, g):
+    """
+    Sign a message using the Schnorr signature scheme.
+
+    Args:
+        message (str): The message to sign.
+        private_key (int): The private key x.
+        p (int): The large prime number p.
+        q (int): The safe prime q.
+        g (int): The generator g.
+
+    Returns:
+        tuple: The signature as (r, s).
+    """
+    k = random.randint(1, q)  # Choose a random integer k
+    r = pow(g, k, p)  # Compute r = g^k mod p
+    # Hash the concatenation of r and message to produce e
+    h = hashlib.sha256(f"{r}{message}".encode()).hexdigest()
+    e = int(h, 16) % q  # Convert hash to integer and reduce modulo q
+    s = (k + e * private_key) % q  # Compute s = (k + e * x) mod q
+    return r, s  # Return the signature
+
+
+# Schnorr Verify
+def schnorr_verify(message, signature, public_key):
+    """
+    Verify a Schnorr signature.
+
+    Args:
+        message (str): The signed message.
+        signature (tuple): The signature (r, s).
+        public_key (tuple): The public key (p, q, g, y).
+
+    Returns:
+        bool: True if the signature is valid, False otherwise.
+    """
+    r, s = signature  # Unpack the signature
+    p, q, g, y = public_key  # Unpack the public key
+    # Hash the concatenation of r and message to produce e
+    h = hashlib.sha256(f"{r}{message}".encode()).hexdigest()
+    e = int(h, 16) % q  # Convert hash to integer and reduce modulo q
+    v1 = pow(g, s, p)  # Compute v1 = g^s mod p
+    v2 = (r * pow(y, e, p)) % p  # Compute v2 = r * y^e mod p
+    return v1 == v2  # Verify the signature
+
+
+# Example usage:
+public_key, private_key = schnorr_keygen()  # Generate public and private keys
+message = "Hello, Schnorr!"  # Define a message to sign
+signature = schnorr_sign(message, private_key, public_key[0], public_key[1], public_key[2])  # Sign the message
+is_valid = schnorr_verify(message, signature, public_key)  # Verify the signature
+
+# Display results
+print("Message:", message)  # Print the message
+print("Signature:", signature)  # Print the generated signature
+print("Signature valid:", is_valid)  # Print whether the signature is valid
+
+
+#Diffie hellman signature 
+import random
+from sympy import isprime
+
+
+# Generate a large prime number
+def generate_large_prime(bits=256):
+    """
+    Generate a random large prime number.
+
+    Args:
+        bits (int): The number of bits for the prime number.
+
+    Returns:
+        int: A large prime number.
+    """
+    while True:
+        prime_candidate = random.getrandbits(bits)  # Generate a random candidate with specified bits
+        if isprime(prime_candidate):  # Check if the candidate is prime
+            return prime_candidate  # Return the prime candidate if it is prime
+
+
+# Diffie-Hellman Key Exchange
+def dh_keygen(bits=256):
+    """
+    Generate Diffie-Hellman public and private keys and compute shared secrets.
+
+    Args:
+        bits (int): The number of bits for the prime number p.
+
+    Returns:
+        tuple: A tuple containing public values (p, g, A, B) and shared secrets for Alice and Bob.
+    """
+    p = generate_large_prime(bits)  # Generate a large prime number p
+    g = random.randint(2, p - 2)  # Choose a random generator g (primitive root modulo p)
+
+    # Generate private keys for Alice and Bob
+    a = random.randint(1, p - 2)  # Private key for Alice
+    b = random.randint(1, p - 2)  # Private key for Bob
+
+    # Compute public keys for Alice and Bob
+    A = pow(g, a, p)  # Public key for Alice: A = g^a mod p
+    B = pow(g, b, p)  # Public key for Bob: B = g^b mod p
+
+    # Calculate shared secret keys
+    shared_secret_Alice = pow(B, a, p)  # Alice computes the shared secret using Bob's public key
+    shared_secret_Bob = pow(A, b, p)  # Bob computes the shared secret using Alice's public key
+
+    return (p, g, A, B), (shared_secret_Alice, shared_secret_Bob)  # Return public values and shared secrets
+
+
+# Example usage:
+(p, g, A, B), (shared_secret_Alice, shared_secret_Bob) = dh_keygen()  # Generate keys and shared secrets
+
+# Display the results
+print("Public values (p, g, A, B):", p, g, A, B)  # Print the public values
+print("Shared secret for Alice:", shared_secret_Alice)  # Print Alice's shared secret
+print("Shared secret for Bob:", shared_secret_Bob)  # Print Bob's shared secret
+print("Do shared secrets match?", shared_secret_Alice == shared_secret_Bob)  # Check if shared secrets match
+
+
+
+#Diffie hellman with RSA
+
+
+from Crypto.PublicKey import RSA
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
+import random
+
+# ---- Step 1: Diffie-Hellman parameters ----
+# Use a small prime for demo; in real scenarios use 2048-bit+ prime
+p = 0xFFFFFFFB
+g = 5
+
+def dh_generate_private_key():
+    return random.randint(2, p-2)
+
+def dh_generate_public_key(private):
+    return pow(g, private, p)
+
+def dh_compute_shared_secret(their_public, private):
+    return pow(their_public, private, p)
+
+# ---- Step 2: Generate RSA keys for signing ----
+alice_rsa = RSA.generate(2048)
+bob_rsa = RSA.generate(2048)
+
+# ---- Step 3: Each party generates DH key pair ----
+alice_private = dh_generate_private_key()
+alice_public = dh_generate_public_key(alice_private)
+
+bob_private = dh_generate_private_key()
+bob_public = dh_generate_public_key(bob_private)
+
+# ---- Step 4: Each party signs their DH public key ----
+alice_pub_bytes = alice_public.to_bytes((alice_public.bit_length() + 7)//8, 'big')
+bob_pub_bytes = bob_public.to_bytes((bob_public.bit_length() + 7)//8, 'big')
+
+# Alice signs
+alice_hash = SHA256.new(alice_pub_bytes)
+alice_signature = pkcs1_15.new(alice_rsa).sign(alice_hash)
+
+# Bob signs
+bob_hash = SHA256.new(bob_pub_bytes)
+bob_signature = pkcs1_15.new(bob_rsa).sign(bob_hash)
+
+# ---- Step 5: Exchange DH public keys and signatures ----
+# Verify Alice's public key at Bob's side
+try:
+    pkcs1_15.new(alice_rsa.publickey()).verify(SHA256.new(alice_pub_bytes), alice_signature)
+    print("Bob verified Alice's DH public key signature.")
+except (ValueError, TypeError):
+    print("Verification failed!")
+
+# Verify Bob's public key at Alice's side
+try:
+    pkcs1_15.new(bob_rsa.publickey()).verify(SHA256.new(bob_pub_bytes), bob_signature)
+    print("Alice verified Bob's DH public key signature.")
+except (ValueError, TypeError):
+    print("Verification failed!")
+
+# ---- Step 6: Compute shared secret ----
+alice_shared = dh_compute_shared_secret(bob_public, alice_private)
+bob_shared = dh_compute_shared_secret(alice_public, bob_private)
+
+print("Shared secret matches:", alice_shared == bob_shared)
+
+
+
+
+#Elgamal signature
+
+
+import random
+from sympy import isprime, mod_inverse
+
+# Helper function to generate a large prime number
+def generate_large_prime(bits=256):
+    while True:
+        candidate = random.getrandbits(bits)
+        if isprime(candidate):
+            return candidate
+
+# ElGamal Key Generation
+def elgamal_keygen(bits=256):
+    p = generate_large_prime(bits)
+    g = random.randint(2, p - 2)
+    x = random.randint(1, p - 2)  # private key
+    y = pow(g, x, p)  # public key component
+    return (p, g, y), x  # Public key and private key
+
+# ElGamal Digital Signature (signing)
+def elgamal_sign(message, private_key, p, g):
+    while True:
+        k = random.randint(1, p - 2)
+        if gcd(k, p - 1) == 1:
+            break
+    r = pow(g, k, p)
+    k_inv = mod_inverse(k, p - 1)
+    s = (k_inv * (message - private_key * r)) % (p - 1)
+    return r, s
+
+
+# ElGamal Signature Verification
+
+def elgamal_verify(message, signature, public_key):
+    p, g, y = public_key
+    r, s = signature
+    if not (0 < r < p):
+        return False
+    left = pow(g, message, p)
+    right = (pow(y, r, p) * pow(r, s, p)) % p
+    return left == right
+
+# GCD function
+def gcd(a, b):
+    while b != 0:
+        a, b = b, a % b
+    return a
+
+# Example usage
+public_key, private_key = elgamal_keygen(128)
+print("Public Key:", public_key)
+print("Private Key:", private_key)
+
+message = 123456  # message as an integer
+signature = elgamal_sign(message, private_key, public_key[0], public_key[1])
+
+print("\nMessage:", message)
+print("Signature (r, s):", signature)
+
+# Verification
+if elgamal_verify(message, signature, public_key):
+    print("Signature is valid!")
+else:
+    print("Signature is invalid!")
+
+
+# client n server signature
+
+#server.py
+import socket
+import struct
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from cryptography.hazmat.primitives import serialization, hashes
+
+def generate_rsa_key_pair():
+    # Generate RSA key pair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+
+    # Serialize keys
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return private_key, private_pem, public_pem
+
+def sign_message(private_key, message):
+    # Sign message
+    signature = private_key.sign(
+        message,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    return signature
+
+def main():
+    private_key, private_pem, public_pem = generate_rsa_key_pair()
+    message = b"Server's response to the client's request"
+
+    signature = sign_message(private_key, message)
+
+    # Create server socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind(('localhost', 65432))
+        server_socket.listen()
+        print("Server listening on port 65432...")
+
+        conn, addr = server_socket.accept()
+        with conn:
+            print("Connected by", addr)
+
+            # Send lengths of key and signature first
+            conn.sendall(struct.pack("!I", len(public_pem)))  # 4 bytes for public key length
+            conn.sendall(public_pem)  # Send public key
+            conn.sendall(struct.pack("!I", len(signature)))  # 4 bytes for signature length
+            conn.sendall(signature)  # Send signature
+            print("Public key and signature sent successfully.")
+
+if __name__ == "__main__":
+    main()
+
+
+
+#client.py
+import socket
+import struct
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+
+def verify_signature(public_key, message, signature):
+    try:
+        public_key.verify(
+            signature,
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        print("Signature is valid ")
+    except Exception as e:
+        print("Signature is invalid :", e)
+
+def main():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+        client_socket.connect(('localhost', 65432))
+
+        # Receive the length of the public key
+        key_length_data = client_socket.recv(4)
+        key_length = struct.unpack("!I", key_length_data)[0]
+
+        # Receive the public key
+        public_key_pem = client_socket.recv(key_length)
+
+        # Receive the length of the signature
+        sig_length_data = client_socket.recv(4)
+        sig_length = struct.unpack("!I", sig_length_data)[0]
+
+        # Receive the signature
+        signature = client_socket.recv(sig_length)
+
+    # Load the public key
+    public_key = serialization.load_pem_public_key(public_key_pem)
+
+    # Original message to verify
+    message = b"Server's response to the client's request"
+
+    # Verify signature
+    verify_signature(public_key, message, signature)
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
