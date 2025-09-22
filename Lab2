@@ -166,4 +166,365 @@ decrypted_text = unpad(decrypted_padded, DES3.block_size).decode()
 print("Decrypted Text:", decrypted_text)
 
 
+# additional 1
+# Using DES and AES(128, 192, and 256 bits key).encrypt the five different messages using 
+# same key. 
+# a. Consider different modes of operation  
+# b.  Plot the graph which shows execution time taken by each technique. 
+# 18 
+# Database and Domain Name Servers (DNS) 
+# c. Compare time taken by different modes of operation 
+
+import time
+import matplotlib.pyplot as plt
+from Crypto.Cipher import DES, AES
+from Crypto.Random import get_random_bytes
+from Crypto.Util import Counter
+
+# --------------------------------------------
+# Helper functions
+# --------------------------------------------
+
+def pad(data, block_size):
+    """PKCS7 Padding"""
+    pad_len = block_size - (len(data) % block_size)
+    return data + bytes([pad_len] * pad_len)
+
+def unpad(data):
+    """Remove PKCS7 padding"""
+    return data[:-data[-1]]
+
+# --------------------------------------------
+# Encryption timing
+# --------------------------------------------
+
+def measure_encryption_time(algorithm, mode_name, messages, key, iv=None, counter=None):
+    start_time = time.time()
+
+    for message in messages:
+        data = pad(message.encode(), algorithm.block_size)
+
+        if algorithm == DES:
+            if mode_name == "ECB":
+                cipher = DES.new(key, DES.MODE_ECB)
+            elif mode_name == "CBC":
+                cipher = DES.new(key, DES.MODE_CBC, iv)
+            elif mode_name == "CFB":
+                cipher = DES.new(key, DES.MODE_CFB, iv)
+            elif mode_name == "OFB":
+                cipher = DES.new(key, DES.MODE_OFB, iv)
+            elif mode_name == "CTR":
+                cipher = DES.new(key, DES.MODE_CTR, counter=counter)
+            else:
+                raise ValueError("Invalid mode")
+
+        elif algorithm == AES:
+            if mode_name == "ECB":
+                cipher = AES.new(key, AES.MODE_ECB)
+            elif mode_name == "CBC":
+                cipher = AES.new(key, AES.MODE_CBC, iv)
+            elif mode_name == "CFB":
+                cipher = AES.new(key, AES.MODE_CFB, iv)
+            elif mode_name == "OFB":
+                cipher = AES.new(key, AES.MODE_OFB, iv)
+            elif mode_name == "CTR":
+                cipher = AES.new(key, AES.MODE_CTR, counter=counter)
+            else:
+                raise ValueError("Invalid mode")
+
+        # Encrypt the message
+        _ = cipher.encrypt(data)
+
+    end_time = time.time()
+    return end_time - start_time
+
+# --------------------------------------------
+# Main execution
+# --------------------------------------------
+
+def main():
+    # Five messages to encrypt
+    messages = [
+        "Hello World!",
+        "This is a test message.",
+        "Cryptography is fun!",
+        "Python makes it easier.",
+        "Final message to encrypt."
+    ]
+
+    # Modes to test
+    modes = ["ECB", "CBC", "CFB", "OFB", "CTR"]
+
+    # DES key and IV
+    des_key = get_random_bytes(8)  # DES uses 8 bytes key
+    des_iv = get_random_bytes(8)   # DES block size is 8 bytes
+
+    # AES keys
+    aes_keys = {
+        "AES-128": get_random_bytes(16),
+        "AES-192": get_random_bytes(24),
+        "AES-256": get_random_bytes(32),
+    }
+    aes_iv = get_random_bytes(16)  # AES block size is 16 bytes
+
+    # Counter for CTR mode
+    ctr_des = Counter.new(64)
+    ctr_aes = Counter.new(128)
+
+    # To store results
+    results = {
+        "DES": {},
+        "AES-128": {},
+        "AES-192": {},
+        "AES-256": {}
+    }
+
+    # Measure time for DES
+    for mode in modes:
+        results["DES"][mode] = measure_encryption_time(DES, mode, messages, des_key, des_iv, ctr_des)
+
+    # Measure time for AES with different key sizes
+    for aes_type, aes_key in aes_keys.items():
+        for mode in modes:
+            results[aes_type][mode] = measure_encryption_time(AES, mode, messages, aes_key, aes_iv, ctr_aes)
+
+    # --------------------------------------------
+    # Plotting results
+    # --------------------------------------------
+    plt.figure(figsize=(12, 6))
+    bar_width = 0.15
+    index = range(len(modes))
+
+    # Plot each algorithm as separate group
+    plt.bar([i - 0.3 for i in index], [results["DES"][mode] for mode in modes], width=bar_width, label="DES")
+    plt.bar(index, [results["AES-128"][mode] for mode in modes], width=bar_width, label="AES-128")
+    plt.bar([i + 0.15 for i in index], [results["AES-192"][mode] for mode in modes], width=bar_width, label="AES-192")
+    plt.bar([i + 0.3 for i in index], [results["AES-256"][mode] for mode in modes], width=bar_width, label="AES-256")
+
+    plt.xlabel("Modes of Operation")
+    plt.ylabel("Execution Time (seconds)")
+    plt.title("DES vs AES Encryption Time Comparison")
+    plt.xticks(index, modes)
+    plt.legend()
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    plt.show()
+
+    # --------------------------------------------
+    # Print results for analysis
+    # --------------------------------------------
+    print("\nExecution Time (seconds):")
+    for algo, mode_times in results.items():
+        print(f"\n{algo}:")
+        for mode, t in mode_times.items():
+            print(f"  {mode}: {t:.6f} sec")
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+# additional 2
+# Encrypt the following block of data using DES with the key "A1B2C3D4E5F60708". The data 
+# to be encrypted is: Mathematica 
+# Block1: 54686973206973206120636f6e666964656e7469616c206d657373616765 
+# Block2: 416e64207468697320697320746865207365636f6e6420626c6f636b 
+# a. Provide the ciphertext for each block. 
+# b. Decrypt the ciphertext to retrieve the original plaintext blocks.
+
+
+from Crypto.Cipher import DES
+from binascii import unhexlify, hexlify
+
+# ----------------------------------------
+# Helper Functions
+# ----------------------------------------
+
+def pad(data):
+    """Pad data to make it a multiple of 8 bytes (PKCS7)"""
+    pad_len = 8 - (len(data) % 8)
+    return data + bytes([pad_len] * pad_len)
+
+def unpad(data):
+    """Remove PKCS7 padding"""
+    return data[:-data[-1]]
+
+# ----------------------------------------
+# DES Encryption / Decryption
+# ----------------------------------------
+
+def des_encrypt_decrypt():
+    # Given DES key
+    key = bytes.fromhex("A1B2C3D4E5F60708")
+
+    # Plaintext blocks (hex encoded strings provided in question)
+    block1_hex = "54686973206973206120636f6e666964656e7469616c206d657373616765"
+    block2_hex = "416e64207468697320697320746865207365636f6e6420626c6f636b"
+
+    # Convert hex to bytes
+    block1 = unhexlify(block1_hex)
+    block2 = unhexlify(block2_hex)
+
+    print("Original Block 1 (ASCII):", block1.decode())
+    print("Original Block 2 (ASCII):", block2.decode())
+
+    # Create DES cipher (ECB mode for simplicity)
+    cipher = DES.new(key, DES.MODE_ECB)
+
+    # Padding (DES works with 8-byte blocks)
+    block1_padded = pad(block1)
+    block2_padded = pad(block2)
+
+    # Encrypt each block
+    ciphertext_block1 = cipher.encrypt(block1_padded)
+    ciphertext_block2 = cipher.encrypt(block2_padded)
+
+    # Display ciphertext
+    print("\nCiphertext Block 1 (Hex):", hexlify(ciphertext_block1).decode())
+    print("Ciphertext Block 2 (Hex):", hexlify(ciphertext_block2).decode())
+
+    # Decrypt each block
+    decrypted_block1 = unpad(cipher.decrypt(ciphertext_block1))
+    decrypted_block2 = unpad(cipher.decrypt(ciphertext_block2))
+
+    # Display decrypted plaintext
+    print("\nDecrypted Block 1 (ASCII):", decrypted_block1.decode())
+    print("Decrypted Block 2 (ASCII):", decrypted_block2.decode())
+
+    print("\nDecrypted Block 1 (Hex):", hexlify(decrypted_block1).decode())
+    print("Decrypted Block 2 (Hex):", hexlify(decrypted_block2).decode())
+
+# Run the function
+des_encrypt_decrypt()
+
+
+
+# additional 3
+# Using AES-256, encrypt the message "Encryption Strength" with the key
+# "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF".
+# Then decrypt the ciphertext to verify the original message.
+
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+from binascii import hexlify
+
+# ----------------------------------------
+# AES-256 Encryption and Decryption
+# ----------------------------------------
+
+def aes_256_encrypt_decrypt():
+    # Given key (hex string) -> Convert to bytes
+    key_hex = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+    key = bytes.fromhex(key_hex)
+
+    # Verify key length (AES-256 requires 32 bytes)
+    print("Key Length:", len(key), "bytes")
+
+    # Message to encrypt
+    message = b"Encryption Strength"
+    print("Original Message:", message.decode())
+
+    # AES works with 16-byte blocks, so we need to pad the message
+    padded_message = pad(message, AES.block_size)
+
+    # Create AES cipher in ECB mode
+    cipher = AES.new(key, AES.MODE_ECB)
+
+    # Encrypt
+    ciphertext = cipher.encrypt(padded_message)
+    print("\nCiphertext (Hex):", hexlify(ciphertext).decode())
+
+    # Decrypt
+    decrypted_padded = cipher.decrypt(ciphertext)
+    decrypted_message = unpad(decrypted_padded, AES.block_size)
+
+    # Show decrypted message
+    print("Decrypted Message:", decrypted_message.decode())
+
+# Run the function
+aes_256_encrypt_decrypt()
+
+
+# # additional 4
+# Encrypt the message "Secure Communication" using DES in Cipher Block Chaining (CBC)
+# mode with the key "A1B2C3D4" and an initialization vector (IV) of "12345678". Provide the
+# ciphertext and then decrypt it to retrieve the original message.
+from Crypto.Cipher import DES
+from Crypto.Util.Padding import pad, unpad
+from binascii import hexlify
+
+# ----------------------------------------
+# DES CBC Mode Encryption and Decryption
+# ----------------------------------------
+
+def des_cbc_encrypt_decrypt():
+    # Key and IV must be 8 bytes for DES
+    key = b"A1B2C3D4"          # 8-byte key
+    iv = b"12345678"            # 8-byte initialization vector (IV)
+
+    # Message to be encrypted
+    message = b"Secure Communication"
+    print("Original Message:", message.decode())
+
+    # Pad the message to make it a multiple of 8 bytes
+    padded_message = pad(message, DES.block_size)
+
+    # Create DES cipher in CBC mode
+    cipher_encrypt = DES.new(key, DES.MODE_CBC, iv)
+
+    # Encrypt the message
+    ciphertext = cipher_encrypt.encrypt(padded_message)
+    print("\nCiphertext (Hex):", hexlify(ciphertext).decode())
+
+    # Decrypt using the same key and IV
+    cipher_decrypt = DES.new(key, DES.MODE_CBC, iv)
+    decrypted_padded = cipher_decrypt.decrypt(ciphertext)
+
+    # Unpad to get the original message
+    decrypted_message = unpad(decrypted_padded, DES.block_size)
+    print("Decrypted Message:", decrypted_message.decode())
+
+# Run the function
+des_cbc_encrypt_decrypt()
+
+
+#  additional 5
+# Encrypt the message "Cryptography Lab Exercise" using AES in Counter (CTR) mode with
+# the key "0123456789ABCDEF0123456789ABCDEF" and a nonce of "0000000000000000".
+# Provide the ciphertext and then decrypt it to retrieve the original message.
+
+from Crypto.Cipher import AES
+from binascii import hexlify
+
+# ----------------------------------------
+# AES CTR Mode Encryption and Decryption
+# ----------------------------------------
+
+def aes_ctr_encrypt_decrypt():
+    # AES key: 32 hex chars = 16 bytes (AES-128)
+    key = bytes.fromhex("0123456789ABCDEF0123456789ABCDEF")  # 16 bytes
+
+    # Nonce: 16 hex chars = 8 bytes
+    nonce = bytes.fromhex("0000000000000000")  # 8 bytes
+
+    # Message to encrypt
+    message = b"Cryptography Lab Exercise"
+    print("Original Message:", message.decode())
+
+    # Create AES cipher in CTR mode
+    cipher_encrypt = AES.new(key, AES.MODE_CTR, nonce=nonce)
+
+    # Encrypt the message
+    ciphertext = cipher_encrypt.encrypt(message)
+    print("\nCiphertext (Hex):", hexlify(ciphertext).decode())
+
+    # Decrypt using same key and nonce
+    cipher_decrypt = AES.new(key, AES.MODE_CTR, nonce=nonce)
+    decrypted_message = cipher_decrypt.decrypt(ciphertext)
+
+    print("Decrypted Message:", decrypted_message.decode())
+
+# Run the function
+aes_ctr_encrypt_decrypt()
 
