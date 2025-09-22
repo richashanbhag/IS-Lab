@@ -598,17 +598,18 @@ print(f"Encryption Time: {end_enc - start_enc:.6f} sec")
 print(f"Decryption Time: {end_dec - start_dec:.6f} sec")
 
 
-#Rabin
+#Rabin 
+
 import random
 import math
 
 # ---------- Key Generation ----------
-def generate_keys():
-    # Generate two large primes p and q such that p ≡ q ≡ 3 (mod 4)
+def generate_keys(bits=32):
+    """Generate public and private keys for Rabin cryptosystem."""
     def get_prime():
         while True:
-            num = random.getrandbits(16)  # 16-bit prime for simplicity
-            if num % 4 == 3 and all(num % i != 0 for i in range(2, int(math.sqrt(num)) + 1)):
+            num = random.getrandbits(bits)
+            if num % 4 == 3 and all(num % i != 0 for i in range(2, int(math.isqrt(num)) + 1)):
                 return num
 
     p = get_prime()
@@ -622,6 +623,8 @@ def generate_keys():
 # ---------- Encryption ----------
 def encrypt(m, n):
     """Encrypt integer message m using Rabin."""
+    if m >= n:
+        raise ValueError("Message integer too large for modulus n.")
     return pow(m, 2, n)
 
 # ---------- Decryption ----------
@@ -631,18 +634,17 @@ def decrypt(c, p, q):
     mp = pow(c, (p + 1) // 4, p)
     mq = pow(c, (q + 1) // 4, q)
 
-    # Extended Euclidean Algorithm to solve CRT
+    # Extended Euclidean Algorithm
     def egcd(a, b):
         if a == 0:
             return (b, 0, 1)
         g, y, x = egcd(b % a, a)
         return (g, x - (b // a) * y, y)
 
-    # Solve using CRT
     gcd, yp, yq = egcd(p, q)
     n = p * q
 
-    # Four possible plaintexts
+    # Four possible plaintexts using CRT
     r1 = (yp * p * mq + yq * q * mp) % n
     r2 = n - r1
     r3 = (yp * p * mq - yq * q * mp) % n
@@ -659,13 +661,15 @@ def int_to_string(m_int):
     """Convert integer back to string."""
     try:
         return m_int.to_bytes((m_int.bit_length() + 7) // 8, 'big').decode()
-    except UnicodeDecodeError:
+    except:
         return None
 
 # ---------- Demo ----------
 if __name__ == "__main__":
+    random.seed(42)  # For reproducibility
+
     # Key generation
-    n, p, q = generate_keys()
+    n, p, q = generate_keys(bits=32)
     print(f"Public key (n): {n}")
     print(f"Private keys (p, q): {p}, {q}")
 
@@ -688,10 +692,76 @@ if __name__ == "__main__":
         decoded = int_to_string(c)
         print(f"Candidate {idx}: {decoded} ({c})")
 
-    # Find the correct plaintext automatically
+    # Identify correct plaintext
     for c in candidates:
         decoded = int_to_string(c)
         if decoded == message:
             print(f"\nCorrect Decryption Found: {decoded}")
             break
+
+
+
+#additional 1
+# With the ElGamal public key (p = 7919, g = 2, h = 6465) and the private key x = 2999, encrypt
+# the message "Asymmetric Algorithms". Decrypt the resulting ciphertext to verify the original
+# message.
+# elgamal_demo.py
+from secrets import randbelow
+from Crypto.Util.number import inverse
+import sys
+
+# Given values
+p = 7919
+g = 2
+h_given = 6465   # given in the problem statement (but inconsistent with x below)
+x = 2999         # private key (given)
+
+message = "Asymmetric Algorithms"
+
+# 1) Check consistency of given public key h
+h_computed = pow(g, x, p)
+print("Given h:", h_given)
+print("Computed h = g^x mod p:", h_computed)
+if h_given != h_computed:
+    print("\nWARNING: Given h does NOT equal g^x mod p.")
+    print("Encryption with given h will NOT be decryptable with private key x.")
+    print("Proceeding with corrected public key h = g^x mod p for successful encrypt/decrypt.\n")
+
+# Use corrected h for encryption/decryption
+h = h_computed
+
+# Convert message to bytes
+msg_bytes = message.encode('utf-8')
+
+# Because p is small (~7919), we can encrypt one byte at a time (0..255 < p)
+# Encrypt each byte separately
+ciphertext = []
+for b in msg_bytes:
+    # choose random k in [1, p-2]
+    k = randbelow(p - 2) + 1
+    c1 = pow(g, k, p)
+    c2 = (b * pow(h, k, p)) % p
+    ciphertext.append((c1, c2))
+
+print("Ciphertext (first 8 pairs shown):", ciphertext[:8])
+
+# Decrypt
+recovered_bytes = []
+for c1, c2 in ciphertext:
+    s = pow(c1, x, p)          # shared secret
+    s_inv = pow(s, -1, p)      # modular inverse of s mod p
+    m = (c2 * s_inv) % p
+    # m should equal original byte value (0..255)
+    if not (0 <= m <= 255):
+        print("Warning: decrypted integer", m, "is outside byte range; decryption may be invalid.")
+    recovered_bytes.append(m)
+
+# Convert back to string
+recovered = bytes(recovered_bytes).decode('utf-8', errors='replace')
+print("\nOriginal message:", message)
+print("Decrypted message:", recovered)
+
+# Optional: show full ciphertext length
+print("\nEncrypted", len(ciphertext), "bytes (one pair per plaintext byte).")
+
 
