@@ -673,7 +673,7 @@ if __name__ == "__main__":
     else:
         print("\nCould not find a valid key for the given sample.")
 
-
+# columnar functions
 import math
 
 # Encrypt function
@@ -726,6 +726,8 @@ print("Encrypted:", ciphertext)
 decrypted = columnar_decrypt(ciphertext, key)
 print("Decrypted:", decrypted)
 
+
+# rail_fence functions
 
 # Encrypt function
 def rail_fence_encrypt(text, key):
@@ -785,3 +787,30 @@ decrypted = rail_fence_decrypt(ciphertext, key)
 print("Decrypted:", decrypted)
 
              
+# additional 1
+# Use a brute-force attack to decipher the following message enciphered by Alice using an 
+#additive cipher. Suppose that Alice always uses a key that is close to her birthday, which is on 
+#the 13th of the month: 
+#NCJAEZRCLAS/LYODEPRLYZRCLASJLCPEHZDTOPDZOLN&BY
+
+def additive_decrypt(ciphertext, key):
+    plaintext = ""
+    for ch in ciphertext:
+        if ch.isalpha():  # Only decrypt alphabetic characters
+            base = ord('A')
+            decrypted_char = chr((ord(ch) - base - key) % 26 + base)
+            plaintext += decrypted_char
+        else:
+            plaintext += ch  # Keep symbols like '/' and '&'
+    return plaintext
+
+
+ciphertext = "NCJAEZRCLAS/LYODEPRLYZRCLASJLCPEHZDTOPDZOLN&BY"
+
+# Possible keys around Alice's birthday
+possible_keys = range(10, 17)  # 10 to 16 inclusive
+
+print("Brute-force results:\n")
+for key in possible_keys:
+    plaintext = additive_decrypt(ciphertext, key)
+    print(f"Key {key}: {plaintext}")
