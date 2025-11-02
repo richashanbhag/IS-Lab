@@ -10,6 +10,7 @@ import json
 
 def compute_hash(data):
     return hashlib.sha256(data.encode()).hexdigest()
+# return hashlib.sha512(data).hexdigest() if 512 sha
 
 def load_patient_data(filename="patients.txt"):
     """Reads patient data from file and returns {patient_id: record}."""
