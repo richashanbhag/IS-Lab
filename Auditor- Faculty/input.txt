@@ -1,0 +1,4 @@
+Alice | BSc Physics | Physics | 85 | 2025-11-02 10:30
+Bob   | BSc Maths   | Maths   | 92 | 2025-11-02 11:05
+Clara | BSc CS      | CS      | 78 | 2025-11-02 12:10
+David | BSc Physics | Physics | 88 | 2025-11-02 13:00
