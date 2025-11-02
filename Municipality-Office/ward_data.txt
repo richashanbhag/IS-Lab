@@ -1,0 +1,4 @@
+Ward:101 | Zone:North | Officer: Richa | Timestamp: 2025-11-02 | Tax: 25000
+Ward:102 | Zone:South | Officer: Amiya | Timestamp: 2025-11-02 | Tax: 32000
+Ward:103 | Zone:East  | Officer: Arjun | Timestamp: 2025-11-02 | Tax: 28000
+Ward:101 | Zone:North | Officer: Meera | Timestamp: 2025-11-02 | Tax: 15000
