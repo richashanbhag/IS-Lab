@@ -1,5 +1,5 @@
 # Client (Seller):
-# Each seller performs transactions.
+# Each seller performs transactions.(file)
 # Uses Paillier to encrypt each amount.
 # Uses homomorphic addition to compute total (encrypted sum).
 # Decrypts to verify total amount.
@@ -18,26 +18,21 @@
 # Encrypted + Decrypted Totals
 # Signature Verification
 
-
 import socket
-import hashlib
 import pickle
-
-from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
 
 def start_server(host='127.0.0.1', port=5000):
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((host, port))
-    server.listen(2)
+    server.listen(5)
     print(f"[*] Payment Gateway running on {host}:{port}\n")
 
     while True:
         conn, addr = server.accept()
         print(f"[+] Connected with Seller at {addr}")
-
-        import pickle
 
         data = b""
         while True:
@@ -45,30 +40,20 @@ def start_server(host='127.0.0.1', port=5000):
             if not packet:
                 break
             data += packet
+        conn.close()
 
         summary, signature, pubkey_data = pickle.loads(data)
+        print(f"[*] Received transaction summary:\n{summary}")
 
-        # Recreate RSA public key
-        pubkey = RSA.import_key(pubkey_data)
-
-        # Recompute hash of summary
-        hash_val = hashlib.sha256(summary.encode()).digest()
-
-        hash_obj = SHA256.new(summary.encode())
+        # Verify signature
+        public_rsa = RSA.import_key(pubkey_data)
+        h = SHA256.new(summary.encode())
 
         try:
-            pkcs1_15.new(pubkey).verify(hash_obj, signature)
-            verification_status = "VALID "
+            pkcs1_15.new(public_rsa).verify(h, signature)
+            print("[+] Digital Signature Verified Successfully.\n")
         except (ValueError, TypeError):
-            verification_status = "INVALID "
-
-        # Display transaction summary and result
-        print("====== Transaction Summary Received ======")
-        print(summary)
-        print(f"\nDigital Signature Verification: {verification_status}")
-        print("==========================================\n")
-
-        conn.close()
+            print("[-] Signature Verification Failed!\n")
 
 if __name__ == "__main__":
     start_server()
