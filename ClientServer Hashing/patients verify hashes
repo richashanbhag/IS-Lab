@@ -1,0 +1,127 @@
+# In this setup, the doctor (server) securely maintains a database of patient records in a file.
+# When a patient (client) requests verification, the doctor computes and sends the SHA-256 hash of the stored record.
+# The patient computes the hash of their own record and verifies if both match.
+# This ensures data integrity — the doctor never sends the actual record, only its hash.
+
+# server.py — Doctor computes and sends hash to patient for verification
+import socket
+import hashlib
+import json
+
+def compute_hash(data):
+    return hashlib.sha256(data.encode()).hexdigest()
+
+def load_patient_data(filename="patients.txt"):
+    """Reads patient data from file and returns {patient_id: record}."""
+    patients = {}
+    try:
+        with open(filename, "r") as file:
+            for line in file:
+                line = line.strip()
+                if not line:
+                    continue
+                pid, record = line.split(",", 1)
+                patients[pid.strip()] = record.strip()
+        return patients
+    except FileNotFoundError:
+        print(f"[!] File '{filename}' not found.")
+        return {}
+
+def start_server(host='127.0.0.1', port=5000):
+    # Load patient data from file
+    patient_records = load_patient_data()
+    if not patient_records:
+        print("[!] No patient records found. Exiting.")
+        return
+
+    print("[*] Doctor's records loaded:")
+    for pid, record in patient_records.items():
+        print(f"  {pid}: {record}")
+    print()
+
+    # Start TCP socket
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((host, port))
+    server_socket.listen(5)
+    print(f"[*] Doctor (Server) running at {host}:{port}\n")
+
+    while True:
+        conn, addr = server_socket.accept()
+        print(f"[+] Connection from {addr}")
+
+        # Receive patient ID
+        try:
+            patient_id = conn.recv(4096).decode().strip()
+        except Exception:
+            conn.send(b"Invalid data format.")
+            conn.close()
+            continue
+
+        print(f"[*] Received patient ID: {patient_id}")
+
+        # Compute hash if patient exists
+        if patient_id in patient_records:
+            record = patient_records[patient_id]
+            data_hash = compute_hash(record)
+            conn.send(data_hash.encode())
+            print(f"[*] Sent hash for {patient_id}: {data_hash}\n")
+        else:
+            conn.send(b"Error: Patient ID not found.")
+            print(f"[-] Unknown patient ID: {patient_id}\n")
+
+        conn.close()
+
+if __name__ == "__main__":
+    start_server()
+
+
+
+
+# client.py — Patient verifies the hash received from the doctor
+import socket
+import hashlib
+
+def compute_hash(data):
+    return hashlib.sha256(data.encode()).hexdigest()
+
+def start_client(host='127.0.0.1', port=5000):
+    patient_id = input("Enter your patient ID (e.g., patient1): ")
+    record = input("Enter your medical data: ")
+
+    # Connect to doctor
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((host, port))
+
+    # Send only the patient ID
+    client_socket.send(patient_id.encode())
+    print(f"[*] Sent patient ID: {patient_id}")
+
+    # Receive hash from doctor
+    doctor_hash = client_socket.recv(4096).decode()
+    client_socket.close()
+
+    if "Error" in doctor_hash:
+        print(f"[Doctor → Patient] {doctor_hash}")
+        return
+
+    print(f"[Doctor → Patient] Hash received: {doctor_hash}")
+
+    # Compute hash locally
+    local_hash = compute_hash(record)
+    print(f"[*] Local computed hash: {local_hash}")
+
+    # Verify integrity
+    if local_hash == doctor_hash:
+        print("[+] Verification successful: Record matches doctor's version.")
+    else:
+        print("[-] Verification failed: Data mismatch or tampering detected.")
+
+if __name__ == "__main__":
+    start_client()
+
+
+
+# patients.txt
+patient1,John_HeartDisease_45
+patient2,Alice_Diabetes_39
+patient3,Bob_Fever_29
