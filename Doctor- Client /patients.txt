@@ -1,0 +1,4 @@
+Doctor: Dr. Richa | Branch: Cardiology | Patient: Arjun | Timestamp: 2025-11-02 10:30 | Budget: 15
+Doctor: Dr. Richa | Branch: Cardiology | Patient: Meera | Timestamp: 2025-11-02 11:15 | Budget: 20
+Doctor: Dr. Amiya | Branch: Neurology | Patient: Raj | Timestamp: 2025-11-02 09:45 | Budget: 12
+Doctor: Dr. Amiya | Branch: Neurology | Patient: Kiran | Timestamp: 2025-11-02 12:00 | Budget: 18
