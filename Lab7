@@ -5,12 +5,16 @@
 # the sum of the original integers.
 import random
 from math import gcd
+from sympy import randprime
 
 # ---- Key Generation ----
 def lcm(x, y):
     return x * y // gcd(x, y)
 
-def generate_keypair(p, q):
+def generate_keypair(bits=256):
+    # Generate two large random primes
+    p = randprime(2**(bits-1), 2**bits)
+    q = randprime(2**(bits-1), 2**bits)
     n = p * q
     g = n + 1
     lam = lcm(p - 1, q - 1)
@@ -34,17 +38,18 @@ def decrypt(c, pub_key, priv_key):
     return (L * mu) % n
 
 # ---- Demo ----
-p, q = 53, 59  # small primes for demo
-pub_key, priv_key = generate_keypair(p, q)
+pub_key, priv_key = generate_keypair(bits=256)
 
 m1, m2 = 15, 25
 c1 = encrypt(m1, pub_key)
 c2 = encrypt(m2, pub_key)
-print("Ciphertexts:", c1, c2)
+print("Ciphertexts:")
+print("E(15) =", c1)
+print("E(25) =", c2)
 
 # Homomorphic addition: E(m1+m2) = E(m1)*E(m2) mod n^2
 c_add = (c1 * c2) % (pub_key[0] ** 2)
-print("Encrypted sum:", c_add)
+print("\nEncrypted sum (E(15+25)):", c_add)
 
 decrypted_sum = decrypt(c_add, pub_key, priv_key)
 print("Decrypted sum:", decrypted_sum)
@@ -58,15 +63,19 @@ print("Decrypted sum:", decrypted_sum)
 # of the multiplication in encrypted form. Decrypt the result of the multiplication and verify
 # that it matches the product of the original integers.
 
-import random
-from sympy import mod_inverse, isprime
 
+# multiplicative homomorphic property of RSA encryption
+
+import random
+from sympy import mod_inverse, isprime, randprime
 
 class RSA:
-    def __init__(self, bit_length=16):
+    def __init__(self, bit_length=256):  # Increased bit length for larger primes
         # Generate two distinct prime numbers p and q
         self.p = self.generate_prime(bit_length)
         self.q = self.generate_prime(bit_length)
+        while self.q == self.p:  # Ensure distinct primes
+            self.q = self.generate_prime(bit_length)
 
         # Compute n as the product of p and q
         self.n = self.p * self.q
@@ -74,18 +83,15 @@ class RSA:
         # Calculate φ(n) = (p - 1)(q - 1)
         self.phi_n = (self.p - 1) * (self.q - 1)
 
-        # Set e to a commonly used value, 65537
+        # Common choice for public exponent
         self.e = 65537
 
-        # Calculate d, the modular inverse of e mod φ(n)
+        # Calculate private exponent d = e^(-1) mod φ(n)
         self.d = mod_inverse(self.e, self.phi_n)
 
     def generate_prime(self, bit_length):
-        # Continuously generate random numbers until a prime is found
-        while True:
-            num = random.getrandbits(bit_length)  # Generate a random number of the specified bit length
-            if isprime(num):  # Check if the number is prime
-                return num  # Return the prime number
+        # Use sympy's randprime for faster large prime generation
+        return randprime(2**(bit_length - 1), 2**bit_length)
 
     def encrypt(self, plaintext):
         # Encrypt the plaintext using the public key (n, e)
@@ -101,8 +107,8 @@ class RSA:
 
 
 if __name__ == "__main__":
-    # Instantiate the RSA cryptosystem
-    rsa = RSA()
+    # Instantiate the RSA cryptosystem with 256-bit primes
+    rsa = RSA(bit_length=256)
 
     # Encrypt two integers
     plaintext1 = 7
@@ -110,20 +116,348 @@ if __name__ == "__main__":
     ciphertext1 = rsa.encrypt(plaintext1)
     ciphertext2 = rsa.encrypt(plaintext2)
 
-    # Print the resulting ciphertexts
-    print("Ciphertext 1:", ciphertext1)
-    print("Ciphertext 2:", ciphertext2)
+    print("Ciphertexts (truncated):")
+    print("E(7) =", str(ciphertext1)[:60] + "...")
+    print("E(3) =", str(ciphertext2)[:60] + "...")
 
-    # Perform multiplication on the encrypted integers
+    # Perform multiplication on encrypted integers
     encrypted_product = rsa.multiply_encrypted(ciphertext1, ciphertext2)
-    print("Encrypted Product:", encrypted_product)
+    print("\nEncrypted Product (E(7*3)):", str(encrypted_product)[:60] + "...")
 
-    # Decrypt the result of the multiplication
+    # Decrypt the result
     decrypted_product = rsa.decrypt(encrypted_product)
     print("Decrypted Product:", decrypted_product)
 
-    # Verify it matches the product of the original integers
+    # Verify correctness
     original_product = plaintext1 * plaintext2
     print("Original Product:", original_product)
     print("Verification:", decrypted_product == original_product)
 
+
+
+# Homomorphic Multiplication (ElGamal Cryptosystem): Implement ElGamal encryption
+# and demonstrate homomorphic multiplication on encrypted messages. (ElGamal supports
+# multiplication but not homomorphic addition.)
+
+import random
+from Crypto.Util import number
+
+class ElGamal:
+    def __init__(self, bit_length=256):
+        # Generate a large 256-bit prime p
+        self.p = number.getPrime(bit_length)
+        # Choose a random generator g ∈ [2, p−1]
+        self.g = random.randint(2, self.p - 1)
+        # Private key x ∈ [1, p−2]
+        self.x = random.randint(1, self.p - 2)
+        # Public key component y = g^x mod p
+        self.y = pow(self.g, self.x, self.p)
+
+    def encrypt(self, message):
+        # Random ephemeral key k ∈ [1, p−2]
+        k = random.randint(1, self.p - 2)
+        c1 = pow(self.g, k, self.p)
+        c2 = (message * pow(self.y, k, self.p)) % self.p
+        return (c1, c2)
+
+    def decrypt(self, ciphertext):
+        c1, c2 = ciphertext
+        # Shared secret s = c1^x mod p
+        s = pow(c1, self.x, self.p)
+        # Modular inverse of s (using Fermat’s little theorem)
+        s_inv = pow(s, self.p - 2, self.p)
+        return (c2 * s_inv) % self.p
+
+    def get_p(self):
+        return self.p
+
+
+# Homomorphic multiplication: E(m1*m2) = E(m1) * E(m2)
+def homomorphic_multiplication(elgamal, ciphertext1, ciphertext2):
+    c1_1, c2_1 = ciphertext1
+    c1_2, c2_2 = ciphertext2
+    p = elgamal.get_p()
+    return (c1_1 * c1_2 % p, c2_1 * c2_2 % p)
+
+
+# ---- Demonstration ----
+if __name__ == "__main__":
+    # Initialize ElGamal with 256-bit keys
+    elgamal = ElGamal(bit_length=256)
+
+    # Display key information
+    print("=== ElGamal Key Generation ===")
+    print("Prime (p):", elgamal.p)
+    print("Generator (g):", elgamal.g)
+    print("Private key (x):", elgamal.x)
+    print("Public key (y):", elgamal.y)
+
+    # Messages
+    m1, m2 = 5, 3
+    print("\n=== Original Messages ===")
+    print("m1:", m1)
+    print("m2:", m2)
+
+    # Encrypt messages
+    c1 = elgamal.encrypt(m1)
+    c2 = elgamal.encrypt(m2)
+
+    print("\n=== Ciphertexts ===")
+    print("E(m1 = 5):", c1)
+    print("E(m2 = 3):", c2)
+
+    # Homomorphic multiplication
+    c_mult = homomorphic_multiplication(elgamal, c1, c2)
+    print("\n=== Homomorphic Multiplication (E(m1*m2)) ===")
+    print("Encrypted product:", c_mult)
+
+    # Decrypt the product
+    decrypted_product = elgamal.decrypt(c_mult)
+
+    print("\n=== Decryption Result ===")
+    print("Decrypted Product:", decrypted_product)
+    print("Expected Product:", m1 * m2)
+    print("Verification:", decrypted_product == m1 * m2)
+
+
+
+
+#  Secure Data Sharing (Paillier--Addition): Simulate a scenario where two parties share encrypted data
+# and perform calculations on the combined data without decryption
+
+
+import random
+from math import gcd
+
+# --- Paillier Cryptosystem Implementation ---
+class Paillier:
+    def __init__(self, bit_length=256):
+        # Generate two large primes p and q
+        self.p = self.generate_prime(bit_length)
+        self.q = self.generate_prime(bit_length)
+        while self.q == self.p:
+            self.q = self.generate_prime(bit_length)
+
+        # Compute n and n^2
+        self.n = self.p * self.q
+        self.n_sq = self.n * self.n
+
+        # Compute lambda = lcm(p-1, q-1)
+        self.lambda_ = self.lcm(self.p - 1, self.q - 1)
+
+        # Choose g = n + 1 (simplifies computations)
+        self.g = self.n + 1
+
+        # Compute μ = (L(g^λ mod n²))⁻¹ mod n
+        self.mu = self.mod_inverse(self.L_function(pow(self.g, self.lambda_, self.n_sq)), self.n)
+
+    def generate_prime(self, bit_length):
+        """Generate a random prime number."""
+        from sympy import isprime
+        while True:
+            num = random.getrandbits(bit_length)
+            if isprime(num):
+                return num
+
+    def L_function(self, x):
+        """L(x) = (x - 1) // n"""
+        return (x - 1) // self.n
+
+    def lcm(self, a, b):
+        """Least Common Multiple"""
+        return abs(a * b) // gcd(a, b)
+
+    def mod_inverse(self, a, m):
+        """Modular inverse using Extended Euclidean Algorithm"""
+        g, x, y = self.extended_gcd(a, m)
+        if g != 1:
+            raise Exception('Modular inverse does not exist')
+        return x % m
+
+    def extended_gcd(self, a, b):
+        """Extended Euclidean Algorithm"""
+        if a == 0:
+            return (b, 0, 1)
+        else:
+            g, y, x = self.extended_gcd(b % a, a)
+            return (g, x - (b // a) * y, y)
+
+    # --- Encryption and Decryption ---
+    def encrypt(self, m):
+        """Encrypt plaintext m"""
+        r = random.randint(1, self.n - 1)
+        while gcd(r, self.n) != 1:
+            r = random.randint(1, self.n - 1)
+        c = (pow(self.g, m, self.n_sq) * pow(r, self.n, self.n_sq)) % self.n_sq
+        return c
+
+    def decrypt(self, c):
+        """Decrypt ciphertext c"""
+        x = pow(c, self.lambda_, self.n_sq)
+        Lx = self.L_function(x)
+        m = (Lx * self.mu) % self.n
+        return m
+
+    # --- Homomorphic Addition (by ciphertext multiplication) ---
+    def homomorphic_add(self, c1, c2):
+        """E(m1) * E(m2) mod n² = E(m1 + m2)"""
+        return (c1 * c2) % self.n_sq
+
+
+# --- Secure Data Sharing Simulation ---
+if __name__ == "__main__":
+    # Initialize Paillier cryptosystem with 256-bit primes
+    paillier = Paillier(bit_length=256)
+    print("✅ Paillier Cryptosystem Initialized with 256-bit primes\n")
+    print("Public Key (n, g):")
+    print("n =", paillier.n)
+    print("g =", paillier.g)
+    print("\nPrivate Key (λ, μ):")
+    print("λ =", paillier.lambda_)
+    print("μ =", paillier.mu)
+    print("-" * 80)
+
+    # Alice and Bob’s private data
+    alice_data = 15
+    bob_data = 25
+    print(f"Alice’s Data: {alice_data}")
+    print(f"Bob’s Data:   {bob_data}")
+    print("-" * 80)
+
+    # Encryption by both parties
+    alice_enc = paillier.encrypt(alice_data)
+    bob_enc = paillier.encrypt(bob_data)
+    print("Encrypted Alice Data:\n", alice_enc)
+    print("\nEncrypted Bob Data:\n", bob_enc)
+    print("-" * 80)
+
+    # Combine encrypted data (homomorphic addition)
+    combined_cipher = paillier.homomorphic_add(alice_enc, bob_enc)
+    print("Combined (Encrypted Sum):\n", combined_cipher)
+    print("-" * 80)
+
+    # Decrypt the combined result
+    decrypted_sum = paillier.decrypt(combined_cipher)
+    print("Decrypted Combined Result:", decrypted_sum)
+
+    # Verify correctness
+    print("Verification:", decrypted_sum == (alice_data + bob_data))
+
+
+
+# Performance Analysis (Benchmarking): Compare the performance of different PHE 
+# schemes (Paillier and ElGamal) for various operations. 
+
+
+
+import time
+from Crypto.Util import number
+from Crypto.Random import random
+
+class Paillier:
+    def __init__(self, bit_length=2048):
+        # Generate two large prime numbers p and q
+        self.p = number.getPrime(bit_length)
+        self.q = number.getPrime(bit_length)
+        # Calculate n and n_squared
+        self.n = self.p * self.q
+        self.n_squared = self.n ** 2
+        # Set g as n + 1
+        self.g = self.n + 1
+        # Calculate lambda, which is the least common multiple of (p-1) and (q-1)
+        self.lambda_ = (self.p - 1) * (self.q - 1)
+
+    def encrypt(self, message):
+        # Generate a random value r for encryption
+        r = random.randint(1, self.n - 1)
+        # Encrypt the message using the Paillier encryption formula
+        c = (pow(self.g, message, self.n_squared) * pow(r, self.n, self.n_squared)) % self.n_squared
+        return c
+
+    def decrypt(self, ciphertext):
+        # Decrypt the ciphertext using the Paillier decryption formula
+        u = pow(ciphertext, self.lambda_, self.n_squared)
+        l = (u - 1) // self.n
+        return (l * number.inverse(self.lambda_, self.n)) % self.n
+
+    def add_encrypted(self, c1, c2):
+        # Perform homomorphic addition of two encrypted ciphertexts
+        return (c1 * c2) % self.n_squared
+
+
+class ElGamal:
+    def __init__(self, bit_length=2048):
+        # Generate a large prime number p
+        self.p = number.getPrime(bit_length)  
+        # Choose a generator g
+        self.g = random.randint(2, self.p - 1)  
+        # Generate a private key x
+        self.x = random.randint(1, self.p - 2)  
+        # Compute the public key y = g^x mod p
+        self.y = pow(self.g, self.x, self.p)  
+
+    def encrypt(self, message):
+        # Randomly choose k for each encryption
+        k = random.randint(1, self.p - 2)
+        c1 = pow(self.g, k, self.p)  # First part of the ciphertext
+        c2 = (message * pow(self.y, k, self.p)) % self.p  # Second part of the ciphertext
+        return (c1, c2)
+
+    def decrypt(self, ciphertext):
+        c1, c2 = ciphertext
+        s = pow(c1, self.x, self.p)  # Compute the shared secret
+        s_inv = pow(s, self.p - 2, self.p)  # Compute the modular inverse
+        return (c2 * s_inv) % self.p
+
+    def get_p(self):
+        return self.p  # Return the prime number p
+
+
+def benchmark_elgamal():
+    elgamal = ElGamal()
+    message = 5  # Sample message for encryption
+
+    # Measure encryption time
+    start = time.time()
+    ciphertext = elgamal.encrypt(message)
+    encryption_time = time.time() - start
+
+    # Measure decryption time
+    start = time.time()
+    decrypted_message = elgamal.decrypt(ciphertext)
+    decryption_time = time.time() - start
+
+    # Check if the decrypted message matches the original message
+    assert decrypted_message == message, "Decryption failed for ElGamal"
+
+    print(f"ElGamal Encryption Time: {encryption_time:.6f}s")
+    print(f"ElGamal Decryption Time: {decryption_time:.6f}s")
+    print(f"Decrypted message matches the original: {decrypted_message == message}")
+
+
+def benchmark_paillier():
+    paillier = Paillier()
+    message = 5  # Sample message for encryption
+
+    # Measure encryption time
+    start = time.time()
+    ciphertext = paillier.encrypt(message)
+    encryption_time = time.time() - start
+
+    # Measure decryption time
+    start = time.time()
+    decrypted_message = paillier.decrypt(ciphertext)
+    decryption_time = time.time() - start
+
+    # Check if the decrypted message matches the original message
+    assert decrypted_message == message, "Decryption failed for Paillier"
+
+    print(f"Paillier Encryption Time: {encryption_time:.6f}s")
+    print(f"Paillier Decryption Time: {decryption_time:.6f}s")
+    print(f"Decrypted message matches the original: {decrypted_message == message}")
+
+
+if __name__ == "__main__":
+    # Run benchmarks for both ElGamal and Paillier encryption schemes
+    benchmark_elgamal()
+    benchmark_paillier()
