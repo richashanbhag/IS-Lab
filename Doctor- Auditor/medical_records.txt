@@ -1,0 +1,4 @@
+Doctor: Richa | Department: Cardiology | Condition: Cold | Notes: Patient recovering well
+Doctor: Amit | Department: Neurology | Condition: Migraine | Notes: Prescribed mild dosage
+Doctor: Neha | Department: Pediatrics | Condition: Fever | Notes: Recommended rest
+Doctor: Raj | Department: Cardiology | Condition: Hypertension | Notes: Monitoring BP daily
