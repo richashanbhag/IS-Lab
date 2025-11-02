@@ -9,8 +9,10 @@
 # 1d. Implement the search function:
 # o Take a search query as input.
 # o Encrypt the query.
-# o Search the encrypted index for matching terms. 
+# o Search the encrypted index for matching terms.
 # o Decrypt the returned document IDs and display the corresponding documents
+
+
 
 import hashlib
 from Crypto.Cipher import AES
@@ -121,9 +123,7 @@ Documents matching query:
 Bright colors danced across the sky during the sunset .
 '''
 
-
-
-#  Execute the following for PKSE:
+# Execute the following for PKSE:
 # 2a. Create a dataset:
 # o Generate a text corpus of at least ten documents. Each document should contain
 # multiple words.
@@ -137,7 +137,8 @@ Bright colors danced across the sky during the sunset .
 # o Take a search query as input.
 # o Encrypt the query using the public key.
 # o Search the encrypted index for matching terms.
-# o Decrypt the returned document IDs using the private key
+# o Decrypt the returned document IDs using the private key.
+
 
 import hashlib
 from phe import paillier
